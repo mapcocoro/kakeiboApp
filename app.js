@@ -888,36 +888,26 @@ class UI {
         `;
         tbody.appendChild(totalRow);
 
-        // 月別出来事を表示
-        this.renderTimelineMemos(months);
-    }
-
-    // 推移タブの月別出来事を表示
-    renderTimelineMemos(months) {
-        const memoDisplay = document.getElementById('timelineMemoDisplay');
-        if (!memoDisplay) return;
-
-        memoDisplay.innerHTML = '';
-
-        months.forEach(m => {
+        // 出来事行
+        const memoRow = document.createElement('tr');
+        memoRow.className = 'timeline-memo-row';
+        const memoCells = months.map(m => {
             const memo = this.manager.getMemo(m.key);
+            const events = memo.events ? memo.events.trim() : '';
 
-            // 出来事がある場合のみ表示
-            if (memo.events && memo.events.trim()) {
-                const memoItem = document.createElement('div');
-                memoItem.className = 'timeline-memo-item';
-                memoItem.innerHTML = `
-                    <div class="month-label">${m.year}年${m.month}月</div>
-                    <div class="memo-content">${this.escapeHtml(memo.events)}</div>
-                `;
-                memoDisplay.appendChild(memoItem);
+            if (events) {
+                // 改行を削除して1行にする
+                const oneLine = events.replace(/\n/g, ' ');
+                return `<td class="memo-cell" title="${this.escapeHtml(events)}">${this.escapeHtml(oneLine)}</td>`;
+            } else {
+                return `<td class="memo-cell"></td>`;
             }
         });
-
-        // 出来事が1つもない場合
-        if (memoDisplay.children.length === 0) {
-            memoDisplay.innerHTML = '<p style="color: #5f6368; font-size: 12px;">出来事が記録されていません</p>';
-        }
+        memoRow.innerHTML = `
+            <td class="sticky-col memo-label">出来事</td>
+            ${memoCells.join('')}
+        `;
+        tbody.appendChild(memoRow);
     }
 
     // HTMLエスケープ
