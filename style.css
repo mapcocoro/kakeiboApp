@@ -93,9 +93,9 @@ header h1 {
 }
 
 .card h2 {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     color: #202124;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 500;
 }
 
@@ -198,27 +198,32 @@ header h1 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
+}
+
+.list-header h2 {
+    font-size: 14px;
+    font-weight: 500;
 }
 
 .filter-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
 .filter-group label {
-    font-size: 12px;
+    font-size: 11px;
     color: #5f6368;
 }
 
 .filter-group input,
 .filter-group .filter-select {
-    padding: 6px 8px;
+    padding: 4px 6px;
     border: 1px solid #dadce0;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 12px;
 }
 
 .filter-group #savedReports {
@@ -227,16 +232,17 @@ header h1 {
 
 .total-display {
     background: #f8f9fa;
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-radius: 4px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     border: 1px solid #dadce0;
 }
 
 .total-display h3 {
     color: #202124;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 400;
+    line-height: 1.4;
 }
 
 .total-display span {
@@ -263,16 +269,17 @@ thead {
 }
 
 th {
-    padding: 8px;
+    padding: 4px 6px;
     text-align: left;
     font-weight: 500;
     color: #202124;
     border-bottom: 1px solid #dadce0;
     border-right: 1px solid #dadce0;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
     user-select: none;
     white-space: nowrap;
+    line-height: 1.2;
 }
 
 th:hover {
@@ -282,7 +289,7 @@ th:hover {
 th.sortable::after {
     content: ' ⇅';
     opacity: 0.3;
-    font-size: 10px;
+    font-size: 9px;
 }
 
 th.sort-asc::after {
@@ -298,10 +305,15 @@ th.sort-desc::after {
 }
 
 td {
-    padding: 8px;
+    padding: 4px 6px;
     border-bottom: 1px solid #dadce0;
     border-right: 1px solid #dadce0;
-    font-size: 13px;
+    font-size: 12px;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
 }
 
 tbody tr:hover {
@@ -310,22 +322,25 @@ tbody tr:hover {
 
 .action-buttons {
     display: flex;
-    gap: 4px;
+    gap: 2px;
+    white-space: nowrap;
 }
 
 .action-buttons button {
-    padding: 4px 8px;
-    font-size: 11px;
+    padding: 2px 6px;
+    font-size: 10px;
+    line-height: 1.2;
 }
 
 /* カテゴリバッジ */
 .badge {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-size: 10px;
     font-weight: 500;
     white-space: nowrap;
+    line-height: 1.4;
 }
 
 /* カテゴリごとの色分け */
