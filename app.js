@@ -421,6 +421,9 @@ class UI {
                 });
                 document.getElementById(`${targetTab}-tab`).classList.add('active');
 
+                // タブ状態をlocalStorageに保存
+                localStorage.setItem('activeTab', targetTab);
+
                 // タブに応じて更新
                 if (targetTab === 'analysis') {
                     this.updateAnalysis();
@@ -429,6 +432,20 @@ class UI {
                 }
             });
         });
+
+        // リロード時に前回のタブを復元
+        this.restoreActiveTab();
+    }
+
+    // アクティブタブを復元
+    restoreActiveTab() {
+        const savedTab = localStorage.getItem('activeTab');
+        if (savedTab) {
+            const tabBtn = document.querySelector(`.tab-btn[data-tab="${savedTab}"]`);
+            if (tabBtn) {
+                tabBtn.click();
+            }
+        }
     }
 
     // デフォルトの日付を今日に設定
@@ -460,8 +477,16 @@ class UI {
         const endSelect = document.getElementById('timelineEndYear');
         const currentYear = new Date().getFullYear();
 
-        // 2020年から現在年まで
-        for (let year = 2020; year <= currentYear; year++) {
+        // データから最小年を取得
+        const expenses = this.manager.getAllExpenses();
+        let minYear = 2020;
+        if (expenses.length > 0) {
+            const years = expenses.map(e => new Date(e.date).getFullYear());
+            minYear = Math.min(...years);
+        }
+
+        // 最小年から現在年まで
+        for (let year = minYear; year <= currentYear; year++) {
             const option1 = document.createElement('option');
             option1.value = year;
             option1.textContent = `${year}年`;
@@ -473,8 +498,8 @@ class UI {
             endSelect.appendChild(option2);
         }
 
-        // デフォルトは現在年
-        startSelect.value = currentYear;
+        // デフォルトは全期間（最小年から現在年まで）
+        startSelect.value = minYear;
         endSelect.value = currentYear;
     }
 
