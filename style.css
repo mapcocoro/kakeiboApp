@@ -317,11 +317,9 @@ td {
 }
 
 td.action-buttons {
-    display: flex;
-    gap: 2px;
     white-space: nowrap;
-    align-items: center;
     overflow: visible;
+    padding: 2px 4px;
 }
 
 tbody tr:hover {
@@ -333,7 +331,13 @@ tbody tr:hover {
     font-size: 10px;
     line-height: 1.2;
     white-space: nowrap;
-    flex-shrink: 0;
+    margin-right: 2px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.action-buttons button:last-child {
+    margin-right: 0;
 }
 
 /* カテゴリバッジ */
