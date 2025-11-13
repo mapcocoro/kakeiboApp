@@ -316,20 +316,24 @@ td {
     max-width: 200px;
 }
 
-tbody tr:hover {
-    background: #f8f9fa;
-}
-
-.action-buttons {
+td.action-buttons {
     display: flex;
     gap: 2px;
     white-space: nowrap;
+    align-items: center;
+    overflow: visible;
+}
+
+tbody tr:hover {
+    background: #f8f9fa;
 }
 
 .action-buttons button {
     padding: 2px 6px;
     font-size: 10px;
     line-height: 1.2;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* カテゴリバッジ */
