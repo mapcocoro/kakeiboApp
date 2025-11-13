@@ -446,25 +446,29 @@ tbody tr:hover {
 .analysis-controls {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-    padding: 12px;
+    gap: 6px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
     background: white;
     border: 1px solid #dadce0;
     border-radius: 0;
+    flex-wrap: wrap;
 }
 
 .analysis-controls label {
     font-weight: 400;
     color: #5f6368;
-    font-size: 13px;
+    font-size: 11px;
+    white-space: nowrap;
 }
 
-.analysis-controls select {
-    padding: 6px 8px;
+.analysis-controls select,
+.analysis-controls input[type="date"] {
+    padding: 4px 6px;
     border: 1px solid #dadce0;
     border-radius: 4px;
-    font-size: 13px;
+    font-size: 12px;
+    max-width: 150px;
 }
 
 #categoryStats {
