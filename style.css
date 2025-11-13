@@ -503,6 +503,138 @@ tbody tr:hover {
 .category-stat[data-category="ローン"] { border-left-color: #4527a0; }
 .category-stat[data-category="その他"] { border-left-color: #616161; }
 
+/* 推移タブ */
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.timeline-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.timeline-controls label {
+    font-size: 12px;
+    color: #5f6368;
+}
+
+.timeline-controls select {
+    padding: 6px 8px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.timeline-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid #dadce0;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.timeline-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.timeline-table th {
+    background: #f8f9fa;
+    padding: 8px;
+    border: 1px solid #dadce0;
+    font-weight: 500;
+    color: #202124;
+    text-align: center;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.timeline-table .sticky-col {
+    position: sticky;
+    left: 0;
+    background: white;
+    z-index: 11;
+    font-weight: 500;
+}
+
+.timeline-table thead th.sticky-col {
+    background: #f8f9fa;
+    z-index: 12;
+}
+
+.timeline-table td {
+    padding: 6px 8px;
+    border: 1px solid #dadce0;
+    text-align: right;
+    white-space: nowrap;
+    font-size: 11px;
+}
+
+.timeline-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+/* メモセクション */
+.memo-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.memo-controls label {
+    font-size: 12px;
+    color: #5f6368;
+}
+
+.memo-controls input {
+    padding: 6px 8px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.memo-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.memo-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.memo-item h3 {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: #202124;
+}
+
+.memo-item textarea {
+    width: 100%;
+    min-height: 150px;
+    padding: 8px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.memo-section > button {
+    grid-column: 1 / -1;
+    justify-self: start;
+}
+
 /* モーダル */
 .modal {
     display: none;
@@ -577,6 +709,67 @@ tbody tr:hover {
         flex-direction: column;
         align-items: flex-start;
     }
+}
+
+/* 通常入力テーブル */
+.normal-input-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid #dadce0;
+    margin-top: 8px;
+}
+
+.normal-input-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1000px;
+}
+
+.normal-input-table th {
+    background: #f8f9fa;
+    padding: 8px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 500;
+    color: #202124;
+    border-bottom: 1px solid #dadce0;
+    border-right: 1px solid #dadce0;
+    white-space: nowrap;
+}
+
+.normal-input-table td {
+    padding: 4px;
+    border-bottom: 1px solid #dadce0;
+    border-right: 1px solid #dadce0;
+}
+
+.normal-input-table input[type="date"],
+.normal-input-table input[type="text"],
+.normal-input-table input[type="number"],
+.normal-input-table select {
+    width: 100%;
+    padding: 4px 6px;
+    border: 1px solid #dadce0;
+    border-radius: 2px;
+    font-size: 13px;
+}
+
+.normal-input-table input[type="number"] {
+    text-align: right;
+}
+
+.normal-input-table .tax-btn {
+    padding: 4px 8px;
+    background: white;
+    color: #1a73e8;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.normal-input-table .tax-btn:hover {
+    background: #e8f0fe;
 }
 
 /* モード切り替え */

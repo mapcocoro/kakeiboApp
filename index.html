@@ -35,67 +35,60 @@
             <div id="normalInputMode" class="card">
                 <h2>収支を記録</h2>
                 <form id="expenseForm">
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="date">日付</label>
-                            <input type="date" id="date" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="type">種別</label>
-                            <select id="type" required>
-                                <option value="支出">支出</option>
-                                <option value="収入">収入</option>
-                                <option value="投資">投資</option>
-                            </select>
-                        </div>
+                    <div class="normal-input-table-wrapper">
+                        <table class="normal-input-table">
+                            <thead>
+                                <tr>
+                                    <th>日付</th>
+                                    <th>カテゴリ</th>
+                                    <th>小項目</th>
+                                    <th>金額</th>
+                                    <th>税込</th>
+                                    <th>場所</th>
+                                    <th>商品名・メモ</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><input type="date" id="date" required></td>
+                                    <td>
+                                        <select id="category" required>
+                                            <option value="">選択</option>
+                                            <option value="食品">食品</option>
+                                            <option value="日用品">日用品</option>
+                                            <option value="外食費">外食費</option>
+                                            <option value="衣類">衣類</option>
+                                            <option value="家具・家電">家具・家電</option>
+                                            <option value="美容">美容</option>
+                                            <option value="医療費">医療費</option>
+                                            <option value="交際費">交際費</option>
+                                            <option value="レジャー">レジャー</option>
+                                            <option value="ガソリン・ETC">ガソリン・ETC</option>
+                                            <option value="光熱費">光熱費</option>
+                                            <option value="通信費">通信費</option>
+                                            <option value="保険">保険</option>
+                                            <option value="車関連【車検・税金・積立】">車関連【車検・税金・積立】</option>
+                                            <option value="税金">税金</option>
+                                            <option value="経費">経費</option>
+                                            <option value="ローン">ローン</option>
+                                            <option value="その他">その他</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <select id="subcategory">
+                                            <option value="">選択</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="number" id="amount" min="0" placeholder="金額" required></td>
+                                    <td><button type="button" class="tax-btn" id="normalTaxBtn">税込</button></td>
+                                    <td><input type="text" id="place" placeholder="場所"></td>
+                                    <td><input type="text" id="description" placeholder="商品名・メモ"></td>
+                                    <td><button type="submit" class="btn btn-primary">記録</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="category">カテゴリ</label>
-                            <select id="category" required>
-                                <option value="">選択してください</option>
-                                <option value="食品">食品</option>
-                                <option value="日用品">日用品</option>
-                                <option value="外食費">外食費</option>
-                                <option value="衣類">衣類</option>
-                                <option value="家具・家電">家具・家電</option>
-                                <option value="美容">美容</option>
-                                <option value="医療費">医療費</option>
-                                <option value="交際費">交際費</option>
-                                <option value="レジャー">レジャー</option>
-                                <option value="ガソリン・ETC">ガソリン・ETC</option>
-                                <option value="光熱費">光熱費</option>
-                                <option value="通信費">通信費</option>
-                                <option value="保険">保険</option>
-                                <option value="車関連【車検・税金・積立】">車関連【車検・税金・積立】</option>
-                                <option value="税金">税金</option>
-                                <option value="経費">経費</option>
-                                <option value="ローン">ローン</option>
-                                <option value="その他">その他</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="subcategory">小項目（任意）</label>
-                            <select id="subcategory">
-                                <option value="">選択してください</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="amount">金額</label>
-                            <input type="number" id="amount" min="0" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="place">場所</label>
-                            <input type="text" id="place" placeholder="例: イオン銀行">
-                        </div>
-                        <div class="form-group">
-                            <label for="description">商品名・メモ</label>
-                            <input type="text" id="description" placeholder="例: ローン">
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">記録する</button>
                 </form>
             </div>
 

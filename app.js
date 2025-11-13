@@ -364,6 +364,11 @@ class UI {
             this.updateNormalSubcategoryOptions();
         });
 
+        // 通常入力: 税込ボタン
+        document.getElementById('normalTaxBtn').addEventListener('click', () => {
+            this.applyNormalTax();
+        });
+
         // 編集モーダル: カテゴリ変更時に小項目を更新
         document.getElementById('editCategory').addEventListener('change', () => {
             this.updateEditSubcategoryOptions();
@@ -799,6 +804,144 @@ class UI {
         this.renderExpenseList(true);
 
         this.showMessage(`レポート「${report.name}」を読み込みました`);
+    }
+
+    // 推移テーブルをレンダリング
+    renderTimeline() {
+        const startYear = parseInt(document.getElementById('timelineStartYear').value);
+        const endYear = parseInt(document.getElementById('timelineEndYear').value);
+
+        if (startYear > endYear) {
+            alert('開始年は終了年以前である必要があります');
+            return;
+        }
+
+        // 年月のリストを生成
+        const months = [];
+        for (let year = startYear; year <= endYear; year++) {
+            for (let month = 1; month <= 12; month++) {
+                months.push({ year, month, key: `${year}-${String(month).padStart(2, '0')}` });
+            }
+        }
+
+        // カテゴリリスト
+        const categories = ['食品', '日用品', '外食費', '衣類', '家具・家電', '美容', '医療費', '交際費', 'レジャー', 'ガソリン・ETC', '光熱費', '通信費', '保険', '車関連【車検・税金・積立】', '税金', '経費', 'ローン', 'その他'];
+
+        // カテゴリごと・月ごとの集計
+        const data = {};
+        categories.forEach(cat => {
+            data[cat] = {};
+            months.forEach(m => {
+                data[cat][m.key] = 0;
+            });
+        });
+
+        // データを集計
+        this.manager.getAllExpenses().forEach(expense => {
+            const date = expense.date;
+            const yearMonth = date.substring(0, 7); // YYYY-MM
+            if (data[expense.category] && data[expense.category][yearMonth] !== undefined) {
+                data[expense.category][yearMonth] += parseInt(expense.amount || 0);
+            }
+        });
+
+        // テーブルヘッダーを生成
+        const thead = document.getElementById('timelineTableHead');
+        thead.innerHTML = `
+            <tr>
+                <th class="sticky-col">カテゴリ</th>
+                ${months.map(m => `<th>${m.year.toString().substring(2)}.${String(m.month).padStart(2, '0')}</th>`).join('')}
+            </tr>
+        `;
+
+        // テーブルボディを生成
+        const tbody = document.getElementById('timelineTableBody');
+        tbody.innerHTML = '';
+
+        categories.forEach(category => {
+            const row = document.createElement('tr');
+            const cells = months.map(m => {
+                const amount = data[category][m.key];
+                const displayAmount = amount > 0 ? `¥${amount.toLocaleString()}` : '';
+                const bgColor = amount > 0 ? this.getCategoryColor(category) : '';
+                return `<td style="background:${bgColor}">${displayAmount}</td>`;
+            });
+
+            row.innerHTML = `
+                <td class="sticky-col"><span class="badge" data-category="${category}">${category}</span></td>
+                ${cells.join('')}
+            `;
+            tbody.appendChild(row);
+        });
+
+        // 合計行
+        const totalRow = document.createElement('tr');
+        totalRow.style.fontWeight = '500';
+        totalRow.style.borderTop = '2px solid #202124';
+        const totalCells = months.map(m => {
+            const total = categories.reduce((sum, cat) => sum + data[cat][m.key], 0);
+            return `<td>¥${total.toLocaleString()}</td>`;
+        });
+        totalRow.innerHTML = `
+            <td class="sticky-col">合計</td>
+            ${totalCells.join('')}
+        `;
+        tbody.appendChild(totalRow);
+    }
+
+    // カテゴリごとの薄い背景色を取得
+    getCategoryColor(category) {
+        const colors = {
+            '食品': '#e8f5e9',
+            '日用品': '#e3f2fd',
+            '外食費': '#fff3e0',
+            '衣類': '#f3e5f5',
+            '家具・家電': '#e0f2f1',
+            '美容': '#fce4ec',
+            '医療費': '#ffebee',
+            '交際費': '#fff8e1',
+            'レジャー': '#e1f5fe',
+            'ガソリン・ETC': '#efebe9',
+            '光熱費': '#fbe9e7',
+            '通信費': '#e8eaf6',
+            '保険': '#e0f7fa',
+            '車関連【車検・税金・積立】': '#f1f8e9',
+            '税金': '#fce4ec',
+            '経費': '#e0f2f1',
+            'ローン': '#ede7f6',
+            'その他': '#f5f5f5'
+        };
+        return colors[category] || '#f5f5f5';
+    }
+
+    // メモを読み込み
+    loadMemo() {
+        const yearMonth = document.getElementById('memoYearMonth').value;
+        if (!yearMonth) {
+            alert('対象月を選択してください');
+            return;
+        }
+
+        const memo = this.manager.getMemo(yearMonth);
+        document.getElementById('memoEvents').value = memo.events;
+        document.getElementById('memoPlans').value = memo.plans;
+
+        this.showMessage(`${yearMonth}のメモを読み込みました`);
+    }
+
+    // メモを保存
+    saveMemo() {
+        const yearMonth = document.getElementById('memoYearMonth').value;
+        if (!yearMonth) {
+            alert('対象月を選択してください');
+            return;
+        }
+
+        const events = document.getElementById('memoEvents').value;
+        const plans = document.getElementById('memoPlans').value;
+
+        this.manager.saveMemo(yearMonth, events, plans);
+        this.showMessage(`${yearMonth}のメモを保存しました`);
     }
 
     // 分析データ更新
@@ -1429,7 +1572,18 @@ class UI {
         }
     }
 
-    // 消費税を適用（1.1倍）
+    // 通常入力の消費税を適用（1.1倍）
+    applyNormalTax() {
+        const amountInput = document.getElementById('amount');
+        const currentValue = parseFloat(amountInput.value);
+
+        if (!isNaN(currentValue) && currentValue > 0) {
+            const taxIncluded = Math.round(currentValue * 1.1);
+            amountInput.value = taxIncluded;
+        }
+    }
+
+    // 一括入力の消費税を適用（1.1倍）
     applyTax(rowId) {
         const row = document.querySelector(`tr[data-row-id="${rowId}"]`);
         const amountInput = row.querySelector('.bulk-amount');
