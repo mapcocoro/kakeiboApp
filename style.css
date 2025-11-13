@@ -604,6 +604,51 @@ tbody tr:hover {
     background: #f8f9fa;
 }
 
+/* 月別出来事セクション */
+.timeline-memo-section {
+    margin-top: 20px;
+    padding: 16px;
+    background: white;
+    border: 1px solid #dadce0;
+}
+
+.timeline-memo-section h3 {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    color: #202124;
+}
+
+.timeline-memo-display {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.timeline-memo-item {
+    padding: 8px;
+    background: #f8f9fa;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+}
+
+.timeline-memo-item .month-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #5f6368;
+    margin-bottom: 4px;
+}
+
+.timeline-memo-item .memo-content {
+    font-size: 12px;
+    color: #202124;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+
 /* メモセクション */
 .memo-controls {
     display: flex;

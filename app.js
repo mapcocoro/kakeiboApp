@@ -887,6 +887,44 @@ class UI {
             ${totalCells.join('')}
         `;
         tbody.appendChild(totalRow);
+
+        // 月別出来事を表示
+        this.renderTimelineMemos(months);
+    }
+
+    // 推移タブの月別出来事を表示
+    renderTimelineMemos(months) {
+        const memoDisplay = document.getElementById('timelineMemoDisplay');
+        if (!memoDisplay) return;
+
+        memoDisplay.innerHTML = '';
+
+        months.forEach(m => {
+            const memo = this.manager.getMemo(m.key);
+
+            // 出来事がある場合のみ表示
+            if (memo.events && memo.events.trim()) {
+                const memoItem = document.createElement('div');
+                memoItem.className = 'timeline-memo-item';
+                memoItem.innerHTML = `
+                    <div class="month-label">${m.year}年${m.month}月</div>
+                    <div class="memo-content">${this.escapeHtml(memo.events)}</div>
+                `;
+                memoDisplay.appendChild(memoItem);
+            }
+        });
+
+        // 出来事が1つもない場合
+        if (memoDisplay.children.length === 0) {
+            memoDisplay.innerHTML = '<p style="color: #5f6368; font-size: 12px;">出来事が記録されていません</p>';
+        }
+    }
+
+    // HTMLエスケープ
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     // カテゴリごとの薄い背景色を取得
