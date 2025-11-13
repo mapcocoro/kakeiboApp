@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家計簿アプリ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>💰 家計簿アプリ</h1>
+            <div class="header-actions">
+                <button id="exportBtn" class="btn btn-secondary">データエクスポート</button>
+                <button id="importBtn" class="btn btn-secondary">データインポート</button>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="input">入力</button>
+            <button class="tab-btn" data-tab="list">一覧</button>
+            <button class="tab-btn" data-tab="timeline">推移</button>
+            <button class="tab-btn" data-tab="analysis">分析</button>
+        </div>
+
+        <!-- 入力タブ -->
+        <div id="input-tab" class="tab-content active">
+            <!-- モード切り替え -->
+            <div class="mode-switch">
+                <button id="normalModeBtn" class="mode-btn active">通常入力</button>
+                <button id="bulkModeBtn" class="mode-btn">一括入力</button>
+            </div>
+
+            <!-- 通常入力モード -->
+            <div id="normalInputMode" class="card">
+                <h2>収支を記録</h2>
+                <form id="expenseForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="date">日付</label>
+                            <input type="date" id="date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="type">種別</label>
+                            <select id="type" required>
+                                <option value="支出">支出</option>
+                                <option value="収入">収入</option>
+                                <option value="投資">投資</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="category">カテゴリ</label>
+                            <select id="category" required>
+                                <option value="">選択してください</option>
+                                <option value="食品">食品</option>
+                                <option value="日用品">日用品</option>
+                                <option value="外食費">外食費</option>
+                                <option value="衣類">衣類</option>
+                                <option value="家具・家電">家具・家電</option>
+                                <option value="美容">美容</option>
+                                <option value="医療費">医療費</option>
+                                <option value="交際費">交際費</option>
+                                <option value="レジャー">レジャー</option>
+                                <option value="ガソリン・ETC">ガソリン・ETC</option>
+                                <option value="光熱費">光熱費</option>
+                                <option value="通信費">通信費</option>
+                                <option value="保険">保険</option>
+                                <option value="車関連【車検・税金・積立】">車関連【車検・税金・積立】</option>
+                                <option value="税金">税金</option>
+                                <option value="経費">経費</option>
+                                <option value="ローン">ローン</option>
+                                <option value="その他">その他</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="subcategory">小項目（任意）</label>
+                            <select id="subcategory">
+                                <option value="">選択してください</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="amount">金額</label>
+                            <input type="number" id="amount" min="0" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="place">場所</label>
+                            <input type="text" id="place" placeholder="例: イオン銀行">
+                        </div>
+                        <div class="form-group">
+                            <label for="description">商品名・メモ</label>
+                            <input type="text" id="description" placeholder="例: ローン">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">記録する</button>
+                </form>
+            </div>
+
+            <!-- 一括入力モード -->
+            <div id="bulkInputMode" class="card" style="display: none;">
+                <h2>一括入力（レシート入力に便利）</h2>
+
+                <!-- 共通入力欄 -->
+                <div class="bulk-common-inputs">
+                    <div class="form-group">
+                        <label for="bulkCommonDate">共通日付</label>
+                        <input type="date" id="bulkCommonDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="bulkCommonPlace">共通場所</label>
+                        <input type="text" id="bulkCommonPlace" placeholder="例: イオン">
+                    </div>
+                    <button id="applyCommonBtn" class="btn btn-secondary">全行に反映</button>
+                </div>
+
+                <div class="bulk-actions">
+                    <button id="addRowBtn" class="btn btn-secondary">+ 1行追加</button>
+                    <button id="add5RowsBtn" class="btn btn-secondary">+ 5行追加</button>
+                    <button id="add10RowsBtn" class="btn btn-secondary">+ 10行追加</button>
+                    <button id="saveBulkBtn" class="btn btn-primary">まとめて記録</button>
+                </div>
+                <div class="bulk-input-table-wrapper">
+                    <table class="bulk-input-table">
+                        <thead>
+                            <tr>
+                                <th>日付</th>
+                                <th>カテゴリ</th>
+                                <th>小項目</th>
+                                <th>金額</th>
+                                <th>税込</th>
+                                <th>場所</th>
+                                <th>商品名・メモ</th>
+                                <th>削除</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bulkInputTableBody">
+                            <!-- 行がここに追加されます -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 一覧タブ -->
+        <div id="list-tab" class="tab-content">
+            <div class="card">
+                <div class="list-header">
+                    <h2>支出一覧</h2>
+                    <div class="filter-group">
+                        <label for="dateRangeType">期間</label>
+                        <select id="dateRangeType" class="filter-select">
+                            <option value="all">全期間</option>
+                            <option value="month">月指定</option>
+                            <option value="custom">カスタム期間</option>
+                        </select>
+                        <input type="month" id="monthFilter" style="display: none;">
+                        <input type="date" id="startDate" placeholder="開始日" style="display: none;">
+                        <input type="date" id="endDate" placeholder="終了日" style="display: none;">
+                        <button id="applyFilter" class="btn btn-secondary" style="display: none;">適用</button>
+                        <button id="clearFilter" class="btn btn-secondary">クリア</button>
+                        <button id="saveReportBtn" class="btn btn-secondary">📊 レポート保存</button>
+                        <select id="savedReports" class="filter-select">
+                            <option value="">保存済みレポート</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="total-display">
+                    <h3>表示期間の合計: <span id="displayTotal">0</span>円</h3>
+                </div>
+                <div class="table-container">
+                    <table id="expenseTable">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="date">日付</th>
+                                <th class="sortable" data-sort="category">カテゴリ</th>
+                                <th class="sortable" data-sort="subcategory">小項目</th>
+                                <th class="sortable" data-sort="amount">金額</th>
+                                <th class="sortable" data-sort="place">場所</th>
+                                <th class="sortable" data-sort="description">商品名・メモ</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseTableBody">
+                            <!-- データがここに表示されます -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 推移タブ -->
+        <div id="timeline-tab" class="tab-content">
+            <div class="card">
+                <div class="timeline-header">
+                    <h2>カテゴリ別推移（月次）</h2>
+                    <div class="timeline-controls">
+                        <label for="timelineStartYear">開始年</label>
+                        <select id="timelineStartYear"></select>
+                        <label for="timelineEndYear">終了年</label>
+                        <select id="timelineEndYear"></select>
+                        <button id="updateTimelineBtn" class="btn btn-primary">更新</button>
+                    </div>
+                </div>
+                <div class="timeline-table-wrapper">
+                    <table id="timelineTable" class="timeline-table">
+                        <thead id="timelineTableHead">
+                            <!-- ヘッダーが動的に生成されます -->
+                        </thead>
+                        <tbody id="timelineTableBody">
+                            <!-- データが動的に生成されます -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 月ごとのメモ -->
+            <div class="card">
+                <h2>月別メモ・予定</h2>
+                <div class="memo-controls">
+                    <label for="memoYearMonth">対象月</label>
+                    <input type="month" id="memoYearMonth">
+                    <button id="loadMemoBtn" class="btn btn-secondary">読込</button>
+                </div>
+                <div class="memo-section">
+                    <div class="memo-item">
+                        <h3>出来事</h3>
+                        <textarea id="memoEvents" placeholder="今月の出来事を記録..."></textarea>
+                    </div>
+                    <div class="memo-item">
+                        <h3>予定</h3>
+                        <textarea id="memoPlans" placeholder="来月の予定を記入..."></textarea>
+                    </div>
+                    <button id="saveMemoBtn" class="btn btn-primary">保存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 分析タブ -->
+        <div id="analysis-tab" class="tab-content">
+            <div class="analysis-controls">
+                <label for="analysisYear">年を選択</label>
+                <select id="analysisYear"></select>
+                <label for="analysisMonth">月を選択 (任意)</label>
+                <select id="analysisMonth">
+                    <option value="">全て</option>
+                    <option value="1">1月</option>
+                    <option value="2">2月</option>
+                    <option value="3">3月</option>
+                    <option value="4">4月</option>
+                    <option value="5">5月</option>
+                    <option value="6">6月</option>
+                    <option value="7">7月</option>
+                    <option value="8">8月</option>
+                    <option value="9">9月</option>
+                    <option value="10">10月</option>
+                    <option value="11">11月</option>
+                    <option value="12">12月</option>
+                </select>
+                <label for="analysisCategory">カテゴリで絞り込み (任意)</label>
+                <select id="analysisCategory">
+                    <option value="">全カテゴリ</option>
+                    <option value="食品">食品</option>
+                    <option value="日用品">日用品</option>
+                    <option value="外食費">外食費</option>
+                    <option value="衣類">衣類</option>
+                    <option value="家具・家電">家具・家電</option>
+                    <option value="美容">美容</option>
+                    <option value="医療費">医療費</option>
+                    <option value="交際費">交際費</option>
+                    <option value="レジャー">レジャー</option>
+                    <option value="ガソリン・ETC">ガソリン・ETC</option>
+                    <option value="光熱費">光熱費</option>
+                    <option value="通信費">通信費</option>
+                    <option value="保険">保険</option>
+                    <option value="車関連【車検・税金・積立】">車関連【車検・税金・積立】</option>
+                    <option value="税金">税金</option>
+                    <option value="経費">経費</option>
+                    <option value="ローン">ローン</option>
+                </select>
+            </div>
+
+            <div class="card">
+                <h2 id="categoryStatsTitle">カテゴリ別集計</h2>
+                <div id="categoryStats"></div>
+            </div>
+
+            <div class="charts-container">
+                <div class="card">
+                    <h2 id="monthlyChartTitle">月別推移</h2>
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+                <div class="card">
+                    <h2 id="categoryChartTitle">カテゴリ別内訳</h2>
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- モーダル (編集用) -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>支出を編集</h2>
+            <form id="editForm">
+                <input type="hidden" id="editId">
+                <div class="form-group">
+                    <label for="editDate">日付</label>
+                    <input type="date" id="editDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="editCategory">カテゴリ</label>
+                    <select id="editCategory" required>
+                        <option value="食品">食品</option>
+                        <option value="日用品">日用品</option>
+                        <option value="外食費">外食費</option>
+                        <option value="衣類">衣類</option>
+                        <option value="家具・家電">家具・家電</option>
+                        <option value="美容">美容</option>
+                        <option value="医療費">医療費</option>
+                        <option value="交際費">交際費</option>
+                        <option value="レジャー">レジャー</option>
+                        <option value="ガソリン・ETC">ガソリン・ETC</option>
+                        <option value="光熱費">光熱費</option>
+                        <option value="通信費">通信費</option>
+                        <option value="保険">保険</option>
+                        <option value="車関連【車検・税金・積立】">車関連【車検・税金・積立】</option>
+                        <option value="税金">税金</option>
+                        <option value="経費">経費</option>
+                        <option value="ローン">ローン</option>
+                        <option value="その他">その他</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editSubcategory">小項目（任意）</label>
+                    <select id="editSubcategory">
+                        <option value="">選択してください</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editAmount">金額</label>
+                    <input type="number" id="editAmount" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPlace">場所</label>
+                    <input type="text" id="editPlace">
+                </div>
+                <div class="form-group">
+                    <label for="editDescription">商品名・メモ</label>
+                    <input type="text" id="editDescription">
+                </div>
+                <button type="submit" class="btn btn-primary">更新する</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
