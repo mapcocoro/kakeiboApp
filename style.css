@@ -628,12 +628,19 @@ tbody tr:hover {
     text-overflow: ellipsis;
     max-width: 80px;
     width: 80px;
-    cursor: help;
+    cursor: pointer;
     padding: 4px 6px;
+    transition: background-color 0.2s;
+}
+
+.timeline-memo-row .memo-cell:not(:empty):hover {
+    background: #fff3cd;
+    color: #856404;
 }
 
 .timeline-memo-row .memo-cell:empty {
     background: white;
+    cursor: default;
 }
 
 /* メモセクション */

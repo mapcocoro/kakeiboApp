@@ -912,14 +912,19 @@ class UI {
         // 出来事行
         const memoRow = document.createElement('tr');
         memoRow.className = 'timeline-memo-row';
-        const memoCells = months.map(m => {
+        const memoCells = months.map((m, index) => {
             const memo = this.manager.getMemo(m.key);
             const events = memo.events ? memo.events.trim() : '';
 
             if (events) {
-                // 改行を削除して1行にする
-                const oneLine = events.replace(/\n/g, ' ');
-                return `<td class="memo-cell" title="${this.escapeHtml(events)}">${this.escapeHtml(oneLine)}</td>`;
+                // 最初の10文字だけ表示
+                const firstLine = events.split('\n')[0]; // 最初の行を取得
+                const preview = firstLine.length > 10 ? firstLine.substring(0, 10) + '...' : firstLine;
+
+                // HTML属性用に改行を&#10;に変換
+                const titleText = this.escapeHtml(events).replace(/\n/g, '&#10;');
+
+                return `<td class="memo-cell" title="${titleText}" data-memo="${this.escapeHtml(events)}" data-month="${m.year}年${m.month}月" onclick="ui.showMemoDetail(this)">${this.escapeHtml(preview)}</td>`;
             } else {
                 return `<td class="memo-cell"></td>`;
             }
@@ -936,6 +941,21 @@ class UI {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // 出来事詳細を表示
+    showMemoDetail(cell) {
+        const memo = cell.getAttribute('data-memo');
+        const month = cell.getAttribute('data-month');
+
+        if (memo) {
+            // エスケープされたHTMLエンティティを元に戻す
+            const textarea = document.createElement('textarea');
+            textarea.innerHTML = memo;
+            const decodedMemo = textarea.value;
+
+            alert(`【${month}の出来事】\n\n${decodedMemo}`);
+        }
     }
 
     // カテゴリごとの薄い背景色を取得
