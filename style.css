@@ -626,8 +626,10 @@ tbody tr:hover {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 120px;
+    max-width: 80px;
+    width: 80px;
     cursor: help;
+    padding: 4px 6px;
 }
 
 .timeline-memo-row .memo-cell:empty {
