@@ -234,11 +234,17 @@
         <!-- 分析タブ -->
         <div id="analysis-tab" class="tab-content">
             <div class="analysis-controls">
-                <label for="analysisYear">年を選択</label>
-                <select id="analysisYear"></select>
-                <label for="analysisMonth">月を選択 (任意)</label>
-                <select id="analysisMonth">
-                    <option value="">全て</option>
+                <label for="analysisDateRangeType">期間</label>
+                <select id="analysisDateRangeType">
+                    <option value="all">全期間</option>
+                    <option value="year">年指定</option>
+                    <option value="month">月指定</option>
+                    <option value="custom">カスタム期間</option>
+                </select>
+                <label for="analysisYear" id="analysisYearLabel" style="display: none;">年を選択</label>
+                <select id="analysisYear" style="display: none;"></select>
+                <label for="analysisMonth" id="analysisMonthLabel" style="display: none;">月を選択</label>
+                <select id="analysisMonth" style="display: none;">
                     <option value="1">1月</option>
                     <option value="2">2月</option>
                     <option value="3">3月</option>
@@ -252,7 +258,11 @@
                     <option value="11">11月</option>
                     <option value="12">12月</option>
                 </select>
-                <label for="analysisCategory">カテゴリで絞り込み (任意)</label>
+                <label for="analysisStartDate" id="analysisStartDateLabel" style="display: none;">開始日</label>
+                <input type="date" id="analysisStartDate" style="display: none;">
+                <label for="analysisEndDate" id="analysisEndDateLabel" style="display: none;">終了日</label>
+                <input type="date" id="analysisEndDate" style="display: none;">
+                <label for="analysisCategory">カテゴリ絞り込み</label>
                 <select id="analysisCategory">
                     <option value="">全カテゴリ</option>
                     <option value="食品">食品</option>
@@ -272,6 +282,10 @@
                     <option value="税金">税金</option>
                     <option value="経費">経費</option>
                     <option value="ローン">ローン</option>
+                </select>
+                <label for="analysisSubcategory" id="analysisSubcategoryLabel" style="display: none;">小項目絞り込み</label>
+                <select id="analysisSubcategory" style="display: none;">
+                    <option value="">全小項目</option>
                 </select>
             </div>
 

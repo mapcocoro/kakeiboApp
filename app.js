@@ -292,6 +292,11 @@ class UI {
             this.saveMemo();
         });
 
+        // 分析期間タイプ変更
+        document.getElementById('analysisDateRangeType').addEventListener('change', (e) => {
+            this.handleAnalysisDateRangeTypeChange(e.target.value);
+        });
+
         // 分析年月変更
         document.getElementById('analysisYear').addEventListener('change', () => {
             this.updateAnalysis();
@@ -301,7 +306,23 @@ class UI {
             this.updateAnalysis();
         });
 
+        // 分析カテゴリ変更時に小項目を更新
         document.getElementById('analysisCategory').addEventListener('change', () => {
+            this.updateAnalysisSubcategoryOptions();
+            this.updateAnalysis();
+        });
+
+        // 分析小項目変更
+        document.getElementById('analysisSubcategory').addEventListener('change', () => {
+            this.updateAnalysis();
+        });
+
+        // 分析カスタム期間変更
+        document.getElementById('analysisStartDate').addEventListener('change', () => {
+            this.updateAnalysis();
+        });
+
+        document.getElementById('analysisEndDate').addEventListener('change', () => {
             this.updateAnalysis();
         });
 
@@ -972,17 +993,94 @@ class UI {
         this.showMessage(`${yearMonth}のメモを保存しました`);
     }
 
+    // 分析期間タイプ変更時の表示切り替え
+    handleAnalysisDateRangeTypeChange(type) {
+        const yearLabel = document.getElementById('analysisYearLabel');
+        const yearSelect = document.getElementById('analysisYear');
+        const monthLabel = document.getElementById('analysisMonthLabel');
+        const monthSelect = document.getElementById('analysisMonth');
+        const startDateLabel = document.getElementById('analysisStartDateLabel');
+        const startDate = document.getElementById('analysisStartDate');
+        const endDateLabel = document.getElementById('analysisEndDateLabel');
+        const endDate = document.getElementById('analysisEndDate');
+
+        // すべて非表示
+        yearLabel.style.display = 'none';
+        yearSelect.style.display = 'none';
+        monthLabel.style.display = 'none';
+        monthSelect.style.display = 'none';
+        startDateLabel.style.display = 'none';
+        startDate.style.display = 'none';
+        endDateLabel.style.display = 'none';
+        endDate.style.display = 'none';
+
+        // タイプに応じて表示
+        if (type === 'year') {
+            yearLabel.style.display = 'inline';
+            yearSelect.style.display = 'inline';
+        } else if (type === 'month') {
+            yearLabel.style.display = 'inline';
+            yearSelect.style.display = 'inline';
+            monthLabel.style.display = 'inline';
+            monthSelect.style.display = 'inline';
+        } else if (type === 'custom') {
+            startDateLabel.style.display = 'inline';
+            startDate.style.display = 'inline';
+            endDateLabel.style.display = 'inline';
+            endDate.style.display = 'inline';
+        }
+
+        this.updateAnalysis();
+    }
+
+    // 分析タブの小項目選択肢を更新
+    updateAnalysisSubcategoryOptions() {
+        const categorySelect = document.getElementById('analysisCategory');
+        const subcategoryLabel = document.getElementById('analysisSubcategoryLabel');
+        const subcategorySelect = document.getElementById('analysisSubcategory');
+        const selectedCategory = categorySelect.value;
+
+        // 小項目の選択肢をクリア
+        subcategorySelect.innerHTML = '<option value="">全小項目</option>';
+
+        // カテゴリが選択されている場合
+        if (selectedCategory && this.subcategoryMaster[selectedCategory]) {
+            subcategoryLabel.style.display = 'inline';
+            subcategorySelect.style.display = 'inline';
+
+            this.subcategoryMaster[selectedCategory].forEach(subcat => {
+                const option = document.createElement('option');
+                option.value = subcat;
+                option.textContent = subcat;
+                subcategorySelect.appendChild(option);
+            });
+        } else {
+            subcategoryLabel.style.display = 'none';
+            subcategorySelect.style.display = 'none';
+        }
+    }
+
     // 分析データ更新
     updateAnalysis() {
+        const dateRangeType = document.getElementById('analysisDateRangeType').value;
         const year = parseInt(document.getElementById('analysisYear').value);
         const month = document.getElementById('analysisMonth').value;
+        const startDate = document.getElementById('analysisStartDate').value;
+        const endDate = document.getElementById('analysisEndDate').value;
         const selectedCategory = document.getElementById('analysisCategory').value;
+        const selectedSubcategory = document.getElementById('analysisSubcategory').value;
 
-        let expenses;
-        if (month) {
-            expenses = this.manager.getExpensesByMonth(year, parseInt(month));
-        } else {
+        let expenses = this.manager.getAllExpenses();
+
+        // 期間フィルター適用
+        if (dateRangeType === 'year' && year) {
             expenses = this.manager.getExpensesByYear(year);
+        } else if (dateRangeType === 'month' && year && month) {
+            expenses = this.manager.getExpensesByMonth(year, parseInt(month));
+        } else if (dateRangeType === 'custom' && startDate && endDate) {
+            expenses = expenses.filter(e => {
+                return e.date >= startDate && e.date <= endDate;
+            });
         }
 
         // カテゴリフィルター適用
@@ -990,8 +1088,20 @@ class UI {
             expenses = expenses.filter(e => e.category === selectedCategory);
         }
 
+        // 小項目フィルター適用
+        if (selectedSubcategory) {
+            expenses = expenses.filter(e => e.subcategory === selectedSubcategory);
+        }
+
         // タイトル更新
-        if (selectedCategory) {
+        if (selectedSubcategory) {
+            document.getElementById('categoryStatsTitle').textContent =
+                `${selectedCategory} - ${selectedSubcategory}`;
+            document.getElementById('monthlyChartTitle').textContent =
+                `${selectedCategory} - ${selectedSubcategory} - 月別推移`;
+            document.getElementById('categoryChartTitle').textContent =
+                `${selectedCategory} - ${selectedSubcategory}`;
+        } else if (selectedCategory) {
             document.getElementById('categoryStatsTitle').textContent =
                 `${selectedCategory} - 小項目別集計`;
             document.getElementById('monthlyChartTitle').textContent =
@@ -1005,14 +1115,83 @@ class UI {
         }
 
         // カテゴリ別集計または小項目別集計
-        if (selectedCategory) {
+        if (selectedSubcategory) {
+            // 小項目が選択されている場合は簡易統計を表示
+            this.renderSimpleStats(expenses, selectedCategory, selectedSubcategory);
+        } else if (selectedCategory) {
             this.renderSubcategoryStats(expenses, selectedCategory);
         } else {
             this.renderCategoryStats(expenses);
         }
 
         // グラフ更新
-        this.updateCharts(year, selectedCategory);
+        this.updateChartsWithPeriod(expenses, dateRangeType, year, selectedCategory, selectedSubcategory);
+    }
+
+    // 簡易統計表示（小項目選択時）
+    renderSimpleStats(expenses, category, subcategory) {
+        const container = document.getElementById('categoryStats');
+        const total = expenses.reduce((sum, e) => sum + parseInt(e.amount), 0);
+        const count = expenses.length;
+        const average = count > 0 ? Math.round(total / count) : 0;
+
+        container.innerHTML = `
+            <div class="category-summary">
+                <div class="summary-item">
+                    <span>合計金額:</span>
+                    <strong>${total.toLocaleString()}円</strong>
+                </div>
+                <div class="summary-item">
+                    <span>件数:</span>
+                    <strong>${count}件</strong>
+                </div>
+                <div class="summary-item">
+                    <span>平均:</span>
+                    <strong>${average.toLocaleString()}円</strong>
+                </div>
+            </div>
+        `;
+    }
+
+    // グラフ更新（期間対応版）
+    updateChartsWithPeriod(expenses, dateRangeType, year, selectedCategory = null, selectedSubcategory = null) {
+        if (selectedSubcategory) {
+            // 小項目選択時：月別推移のみ表示
+            const monthlyData = this.getMonthlyDataFromExpenses(expenses);
+            this.renderMonthlyChart(monthlyData);
+
+            // 円グラフは非表示にするためダミーデータ
+            this.renderCategoryChart({});
+        } else if (selectedCategory) {
+            // カテゴリ選択時：月別推移と小項目別内訳
+            const monthlyData = this.getMonthlyDataFromExpenses(expenses);
+            this.renderMonthlyChart(monthlyData);
+
+            const subcategoryTotals = {};
+            expenses.forEach(e => {
+                const subcat = e.subcategory || '(未分類)';
+                subcategoryTotals[subcat] = (subcategoryTotals[subcat] || 0) + parseInt(e.amount);
+            });
+            this.renderCategoryChart(subcategoryTotals);
+        } else {
+            // 全カテゴリ：月別推移とカテゴリ別内訳
+            const monthlyData = this.getMonthlyDataFromExpenses(expenses);
+            this.renderMonthlyChart(monthlyData);
+
+            const categoryTotals = this.manager.getCategoryTotals(expenses);
+            this.renderCategoryChart(categoryTotals);
+        }
+    }
+
+    // 支出データから月別データを生成
+    getMonthlyDataFromExpenses(expenses) {
+        const monthlyData = Array(12).fill(0);
+        expenses.forEach(e => {
+            const date = new Date(e.date);
+            const month = date.getMonth();
+            monthlyData[month] += parseInt(e.amount);
+        });
+        return monthlyData;
     }
 
     // カテゴリ別統計表示
@@ -1081,39 +1260,6 @@ class UI {
             });
     }
 
-    // グラフ更新
-    updateCharts(year, selectedCategory = null) {
-        if (selectedCategory) {
-            // 特定カテゴリの月別推移
-            const yearExpenses = this.manager.getExpensesByYear(year);
-            const categoryExpenses = yearExpenses.filter(e => e.category === selectedCategory);
-
-            // 月別集計
-            const monthlyData = Array(12).fill(0);
-            categoryExpenses.forEach(e => {
-                const date = new Date(e.date);
-                monthlyData[date.getMonth()] += parseInt(e.amount);
-            });
-            this.renderMonthlyChart(monthlyData);
-
-            // 小項目別集計
-            const subcategoryTotals = {};
-            categoryExpenses.forEach(e => {
-                const subcat = e.subcategory || '(未分類)';
-                subcategoryTotals[subcat] = (subcategoryTotals[subcat] || 0) + parseInt(e.amount);
-            });
-            this.renderCategoryChart(subcategoryTotals);
-        } else {
-            // 全カテゴリの月別推移
-            const monthlyData = this.manager.getMonthlyTotals(year);
-            this.renderMonthlyChart(monthlyData);
-
-            // カテゴリ別円グラフ
-            const yearExpenses = this.manager.getExpensesByYear(year);
-            const categoryTotals = this.manager.getCategoryTotals(yearExpenses);
-            this.renderCategoryChart(categoryTotals);
-        }
-    }
 
     // 月別推移グラフ
     renderMonthlyChart(data) {
