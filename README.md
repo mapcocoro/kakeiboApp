@@ -20,11 +20,12 @@ kakeibo-app/
 ├── app.js                        # アプリケーションロジック
 ├── .gitignore                    # Git除外設定
 ├── README.md                     # このファイル
-└── update-*.html                 # Topixデータ復元用ファイル
-    ├── update-2020-07.html       # 2020年7月データ
-    ├── update-multiple-months.html # 2020年8-9月データ
-    ├── update-2020-2021.html     # 2020-2021年データ
-    └── update-all-remaining.html # 2022-2025年データ
+└── Topixデータ復元用ファイル
+    ├── topix-complete-restore.html    # 完全復元（2020/7-2025/12）★推奨
+    ├── update-2020-07.html            # 2020年7月データ
+    ├── update-multiple-months.html    # 2020年8-9月データ
+    ├── update-2020-2021.html          # 2020-2021年データ
+    └── update-all-remaining.html      # 2022-2025年データ
 ```
 
 ## 🚀 使い方
@@ -262,6 +263,13 @@ open index.html
 #### Topixデータの復元
 キャッシュ削除でTopix（出来事）が消えた場合：
 
+**方法1: 完全復元（推奨）**
+1. `topix-complete-restore.html` をブラウザで開く
+2. 「完全復元を実行」ボタンをクリック
+3. 2020年7月〜2025年12月の全Topixが一括復元されます
+4. 完了後、アプリ（`index.html`）を開く
+
+**方法2: 期間別復元**
 1. 該当期間の `update-*.html` をブラウザで開く
    - 2020年7月: `update-2020-07.html`
    - 2020年8-9月: `update-multiple-months.html`
@@ -319,6 +327,13 @@ open index.html
 
 ## 🔄 バージョン履歴
 
+### v2.2 (2025-11-14)
+- ✅ Topix完全復元ツール追加（`topix-complete-restore.html`）
+- ✅ 2020年7月〜2025年12月の全Topixデータを一括復元可能
+- ✅ 230件以上のTopixデータ（65ヶ月分）を統合
+- ✅ 進捗バー・統計表示機能
+- ✅ README更新（Topix復元方法を詳細化）
+
 ### v2.1 (2025-11-14)
 - ✅ GitHub Pages公開（複数PC・デバイス対応）
 - ✅ Web版URL: https://mapcocoro.github.io/kakeiboApp/
@@ -355,6 +370,6 @@ open index.html
 
 **作成日**: 2025年11月13日
 **最終更新**: 2025年11月14日
-**バージョン**: 2.1
+**バージョン**: 2.2
 **Web版URL**: https://mapcocoro.github.io/kakeiboApp/
 **リポジトリ**: https://github.com/mapcocoro/kakeiboApp.git

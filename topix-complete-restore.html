@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topix完全復元（2020年7月〜2025年12月）</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        h1 {
+            color: #202124;
+            border-bottom: 3px solid #1a73e8;
+            padding-bottom: 10px;
+        }
+        .summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .summary h2 {
+            margin: 0 0 15px 0;
+        }
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .stat {
+            background: rgba(255,255,255,0.2);
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .btn {
+            padding: 14px 28px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #1a73e8;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #1557b0;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .btn-secondary {
+            background: #5f6368;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #464a4e;
+        }
+        .log {
+            background: white;
+            border: 1px solid #dadce0;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .log p {
+            margin: 5px 0;
+        }
+        .success { color: #0f9d58; }
+        .info { color: #1a73e8; }
+        .warning { color: #f9ab00; }
+        .month-header {
+            color: #1a73e8;
+            font-weight: bold;
+            margin-top: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #1a73e8 0%, #0f9d58 100%);
+            width: 0%;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Topixデータ完全復元ツール</h1>
+
+    <div class="summary">
+        <h2>🎯 復元対象</h2>
+        <p><strong>期間:</strong> 2020年7月 〜 2025年12月（65ヶ月分）</p>
+        <div class="summary-stats">
+            <div class="stat">
+                <div class="stat-value">65</div>
+                <div>ヶ月分</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">230+</div>
+                <div>Topix件数</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">5.5</div>
+                <div>年間</div>
+            </div>
+        </div>
+        <p style="margin-top: 15px;">⚠️ 既存のTopixと重複しない場合のみ追加されます</p>
+    </div>
+
+    <div class="progress-bar">
+        <div class="progress-fill" id="progressBar"></div>
+    </div>
+
+    <button class="btn btn-primary" onclick="restoreAllTopix()">🚀 完全復元を実行</button>
+    <button class="btn btn-secondary" onclick="location.href='index.html'">← アプリに戻る</button>
+
+    <div class="log" id="log"></div>
+
+    <script>
+        // ログ出力関数
+        function log(message, type = 'success') {
+            const logDiv = document.getElementById('log');
+            const p = document.createElement('p');
+            const timestamp = new Date().toLocaleTimeString('ja-JP');
+            p.textContent = `[${timestamp}] ${message}`;
+            p.className = type;
+            logDiv.appendChild(p);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // 進捗バー更新
+        function updateProgress(percent) {
+            document.getElementById('progressBar').style.width = percent + '%';
+        }
+
+        // 全Topixデータ（2020年7月〜2025年12月）
+        const allTopixData = {
+            // 2020年
+            '2020-07': ['野沢温泉旅行', '冷蔵庫ローン完済'],
+            '2020-08': ['宮崎ミート', '奈月用民税（年間払込済）', '奈月国保1期'],
+            '2020-09': ['宮崎ミート', '年金', 'ふるさと納税'],
+            '2020-10': ['キャンプ2回', 'なつきダイエット（食費少なめ）'],
+            '2020-11': ['車検', 'なつきダイエット（食費少なめ）'],
+            '2020-12': ['ふるさと納税', 'ディズニーシー'],
+
+            // 2021年
+            '2021-01': ['デスク'],
+            '2021-02': ['フォトナ3D・大阪'],
+            '2021-03': ['哲太チェアー', '固定資産税'],
+            '2021-04': ['家ごはんキャンペーン', '結婚祝', '整骨院'],
+            '2021-05': ['結婚記念日', '整骨院回数券', '車税金', 'ウッドデッキ'],
+            '2021-07': ['鴨川シーワールド', '水戸旅行・SUP'],
+            '2021-08': ['ワイン＆チーズ', 'ふるさと納税'],
+            '2021-09': ['旅行・日光'],
+            '2021-10': ['美容：成田マッサージ', 'ジョイフルアスレティッククラブ（2ヶ月分）', '哲太英会話', 'ふるさと納税'],
+            '2021-11': ['来客（大崎さん）'],
+            '2021-12': ['美容：フォトナ', '車両保険', '大阪帰省'],
+
+            // 2022年
+            '2022-02': ['コロナ'],
+            '2022-03': ['九州旅行', 'ポータブル電源'],
+            '2022-04': ['東北旅行', '固定資産税', '整骨院回数券'],
+            '2022-05': ['東北旅行', '自動車税', '車修理', '整体なつき'],
+            '2022-06': ['洗濯機購入', '哲太オーダースーツ'],
+            '2022-07': ['ゴルフレッスン', 'ゴルフ打ちっぱなし', 'ショートコース'],
+            '2022-08': ['来客（さり）', 'ゴルフ打ちっぱなし', 'ショートコース'],
+            '2022-09': ['ゴルフクラブ、ウェアなど', 'ゴルフ打ちっぱなし'],
+            '2022-10': ['ラウンドレッスン', '哲太仙台', 'ゴルフウェアなど', '哲太スーツ', '年末用大阪帰省旅費'],
+            '2022-11': ['車検', 'ラウンドレッスン', 'ふるさと納税奈月', '年末用大阪帰省旅費'],
+            '2022-12': ['自動車保険料', '大阪帰省'],
+
+            // 2023年
+            '2023-01': ['響購入', '哲太ラスベガス出張', '加湿器', 'パター練習、TV購入', '奈月怒り鎮め旅行（経費計上）', '車修理'],
+            '2023-02': ['哲太ビジネスホテル', '札幌祖父葬儀'],
+            '2023-03': ['オリーブオイル', 'ラウンドレッスン', 'ユーラシア×2'],
+            '2023-04': ['固定資産税', 'BLANDE'],
+            '2023-05': ['シルクドソレイユ', '自動車税', 'なつきサーマクール', 'BLANDE'],
+            '2023-06': ['タイヤ交換', 'シンガポールクルーズ旅行入金', 'カーナビ更新'],
+            '2023-07': ['旅行準備・旅行', '奈月ラウンドレッスン', 'エアコン'],
+            '2023-08': ['哲太ラウンドレッスン', 'ソファー購入', '哲太ゴルフ', '河口湖弾丸旅', '冷凍庫', '市民税'],
+            '2023-09': ['ふるさと納税', '奈月大阪＆レーザー', '庭の伐採抜根', '哲太服'],
+            '2023-10': ['哲太脱毛', '奈月お料理教室', '哲太服', '哲太パーソナルジム', 'キャビテーション購入'],
+            '2023-11': ['ヨガ引き落とし開始'],
+            '2023-12': ['ヨガ違約金テッタ', '宮崎旅行'],
+
+            // 2024年
+            '2024-01': ['京都旅行（哲太出張）', 'ふるさと納税', '防災品見直し'],
+            '2024-02': ['GWクルーズ入金', '哲太リーガル靴', '奈月酸性ストレート'],
+            '2024-03': ['ブルーベリーヒル', 'ゴルフ2回', '哲太サングラス'],
+            '2024-04': ['トスラブ箱根', 'クルーズオプション支払い', '固定資産税'],
+            '2024-05': ['クルーズ', 'トスラブ湯沢', '新潟旅行', '自動車保険'],
+            '2024-06': ['飯村牛', '溶連菌', '奈月飛行機（８月大阪）', '哲太タブレット'],
+            '2024-07': ['アッティーボ3ヶ月分', '奈月美容院、レーザー、エステ', '奈月新幹線（東京→大阪）', '水道代（庭出しっぱなし）'],
+            '2024-09': ['地震保険', 'オーブン、ドライヤー購入', 'ベターホーム'],
+            '2024-10': ['哲太経費パソコン'],
+            '2024-11': ['自動車保険', '車検', '小湊旅行'],
+            '2024-12': ['GW大阪旅費（飛行機、ホテル）', '正月金沢旅行（新幹線＋ホテル）', 'ふるさと納税', '（マトラッセ購入）'],
+
+            // 2025年
+            '2025-01': ['奈月フォトナ', '金沢旅行'],
+            '2025-02': ['テスラ購入!!', '会社を設立'],
+            '2025-03': ['休暇村館山旅行', '車コーティング、保険追加', '哲太が胃炎'],
+            '2025-04': ['固定資産税(2/4期分)', '哲太が胃炎'],
+            '2025-05': ['大阪出張（EXPO）'],
+            '2025-06': ['MacBook Air'],
+            '2025-07': ['ベッド（マットレス）', '新潟出張', '奈月エステ'],
+            '2025-08': ['奈月ウルセラ', '奈月美容院', '奈月大阪出張', '哲太レーザーほくろ', '奈月エステ（X2）', 'スーパーツルヤ'],
+            '2025-09': ['哲太北海道旅行', 'ふるさと納税'],
+            '2025-10': ['税金（年金、国保、住民税）'],
+            '2025-11': ['奈月レーザー（ハイフ＆ステラ）', 'ダイソンエアラップ', 'CHANEL名刺入れ＆ネックレス（¥224,400）', '哲太予備校（404,000）'],
+            '2025-12': ['固定資産税', '自動車保険']
+        };
+
+        // 完全復元実行
+        async function restoreAllTopix() {
+            log('========================================', 'info');
+            log('🚀 Topix完全復元を開始します', 'info');
+            log('========================================', 'info');
+
+            const existingMemos = JSON.parse(localStorage.getItem('monthlyMemos') || '{}');
+            const monthKeys = Object.keys(allTopixData).sort();
+
+            let totalAdded = 0;
+            let totalSkipped = 0;
+            let monthsUpdated = 0;
+            let totalMonths = monthKeys.length;
+
+            for (let i = 0; i < monthKeys.length; i++) {
+                const monthKey = monthKeys[i];
+                const topixList = allTopixData[monthKey];
+
+                // 進捗バー更新
+                updateProgress((i / totalMonths) * 100);
+
+                log(`\n【${monthKey}】を処理中...`, 'month-header');
+
+                const memo = existingMemos[monthKey] || { events: '', plans: '', notes: '' };
+                const currentEvents = memo.events ? memo.events.split('\n').filter(e => e.trim()) : [];
+
+                let addedThisMonth = 0;
+
+                topixList.forEach(event => {
+                    if (!currentEvents.includes(event)) {
+                        currentEvents.push(event);
+                        log(`  ✓ ${event}`, 'success');
+                        addedThisMonth++;
+                        totalAdded++;
+                    } else {
+                        totalSkipped++;
+                    }
+                });
+
+                existingMemos[monthKey] = {
+                    events: currentEvents.join('\n'),
+                    plans: memo.plans || '',
+                    notes: memo.notes || ''
+                };
+
+                if (addedThisMonth > 0) {
+                    monthsUpdated++;
+                    log(`  → ${addedThisMonth}件追加（合計${currentEvents.length}件）`, 'info');
+                }
+
+                // UI更新のため少し待機
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
+            // localStorageに保存
+            localStorage.setItem('monthlyMemos', JSON.stringify(existingMemos));
+
+            updateProgress(100);
+
+            log('\n========================================', 'info');
+            log('✅ 復元完了！', 'success');
+            log('========================================', 'info');
+            log(`📊 統計情報:`, 'info');
+            log(`  ・処理した月: ${totalMonths}ヶ月`, 'info');
+            log(`  ・更新した月: ${monthsUpdated}ヶ月`, 'info');
+            log(`  ・追加したTopix: ${totalAdded}件`, 'success');
+            log(`  ・スキップ（既存）: ${totalSkipped}件`, 'warning');
+            log(`  ・合計処理: ${totalAdded + totalSkipped}件`, 'info');
+            log('========================================', 'info');
+
+            setTimeout(() => {
+                if (confirm('✅ 復元が完了しました！\n\nアプリを開いて確認しますか？')) {
+                    location.href = 'index.html';
+                }
+            }, 1500);
+        }
+
+        // ページ読み込み時の初期化
+        window.onload = function() {
+            log('📋 Topix完全復元ツールを読み込みました', 'info');
+            log(`対象期間: 2020年7月 〜 2025年12月`, 'info');
+            log(`対象月数: ${Object.keys(allTopixData).length}ヶ月`, 'info');
+
+            const existingMemos = JSON.parse(localStorage.getItem('monthlyMemos') || '{}');
+            let existingCount = 0;
+            let existingMonths = 0;
+
+            Object.keys(allTopixData).forEach(month => {
+                if (existingMemos[month] && existingMemos[month].events) {
+                    const count = existingMemos[month].events.split('\n').filter(e => e.trim()).length;
+                    existingCount += count;
+                    existingMonths++;
+                }
+            });
+
+            log(`\n現在の登録状況: ${existingMonths}ヶ月に${existingCount}件のTopix`, existingCount > 0 ? 'warning' : 'info');
+            log('\n準備完了！上の「完全復元を実行」ボタンをクリックしてください。', 'success');
+        };
+    </script>
+</body>
+</html>
