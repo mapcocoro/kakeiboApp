@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>2020-07 Topix更新</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            border-radius: 4px;
+            border: none;
+        }
+        .btn-primary {
+            background: #1a73e8;
+            color: white;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dadce0;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            color: #0f9d58;
+        }
+    </style>
+</head>
+<body>
+    <h1>2020-07のTopixを更新</h1>
+    <p>「野沢温泉旅行」と「冷蔵庫ローン完済」を追加します。</p>
+
+    <button class="btn btn-primary" onclick="updateTopix()">更新実行</button>
+    <button class="btn" onclick="location.href='index.html'">アプリに戻る</button>
+
+    <div class="log" id="log"></div>
+
+    <script>
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const p = document.createElement('p');
+            p.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            p.className = 'success';
+            logDiv.appendChild(p);
+        }
+
+        function updateTopix() {
+            // 既存のメモデータを取得
+            const existingMemos = JSON.parse(localStorage.getItem('monthlyMemos') || '{}');
+
+            log('現在のデータを読み込みました');
+
+            // 2020-07のデータを取得
+            const memo202007 = existingMemos['2020-07'] || { events: '', plans: '', notes: '' };
+
+            log('2020-07の現在のTopix: ' + (memo202007.events || '(なし)'));
+
+            // 既存のイベントを配列に変換
+            const currentEvents = memo202007.events ? memo202007.events.split('\n').filter(e => e.trim()) : [];
+
+            // 追加するイベント
+            const newEvents = ['野沢温泉旅行', '冷蔵庫ローン完済'];
+
+            // 重複チェックしながら追加
+            newEvents.forEach(event => {
+                if (!currentEvents.includes(event)) {
+                    currentEvents.push(event);
+                    log(`追加: ${event}`);
+                } else {
+                    log(`既に存在: ${event}`);
+                }
+            });
+
+            // データを更新
+            existingMemos['2020-07'] = {
+                events: currentEvents.join('\n'),
+                plans: memo202007.plans || '',
+                notes: memo202007.notes || ''
+            };
+
+            // localStorageに保存
+            localStorage.setItem('monthlyMemos', JSON.stringify(existingMemos));
+
+            log('2020-07のTopixを更新しました！');
+            log('更新後のTopix: ' + currentEvents.join(', '));
+
+            setTimeout(() => {
+                if (confirm('更新が完了しました。アプリを開きますか？')) {
+                    location.href = 'index.html';
+                }
+            }, 1000);
+        }
+
+        // ページ読み込み時に現在のデータを表示
+        window.onload = function() {
+            const existingMemos = JSON.parse(localStorage.getItem('monthlyMemos') || '{}');
+            const memo202007 = existingMemos['2020-07'] || { events: '' };
+
+            if (memo202007.events) {
+                log('現在の2020-07のTopix:');
+                memo202007.events.split('\n').forEach(event => {
+                    if (event.trim()) {
+                        log('  - ' + event);
+                    }
+                });
+            } else {
+                log('現在2020-07にはTopixがありません');
+            }
+        };
+    </script>
+</body>
+</html>

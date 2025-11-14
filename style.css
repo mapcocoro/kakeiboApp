@@ -20,6 +20,7 @@ body {
     border-radius: 0;
     box-shadow: none;
     overflow: hidden;
+    zoom: 0.7;
 }
 
 /* ヘッダー */
@@ -226,6 +227,14 @@ header h1 {
     font-size: 12px;
 }
 
+.filter-group .filter-search {
+    min-width: 200px;
+    padding: 4px 6px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
 .filter-group #savedReports {
     min-width: 150px;
 }
@@ -314,6 +323,12 @@ td {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 200px;
+}
+
+/* 一覧の金額列を少し大きく */
+table tbody tr td:nth-child(4) {
+    font-size: 14px;
+    font-weight: 500;
 }
 
 td.action-buttons {
@@ -570,9 +585,25 @@ tbody tr:hover {
     font-size: 12px;
 }
 
-.timeline-table th {
+/* 分析タブの年別テーブル（1年分・横スクロールなし） */
+.yearly-table-wrapper {
+    overflow-x: hidden;
+    border: 1px solid #dadce0;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.yearly-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    table-layout: fixed;
+}
+
+.timeline-table th,
+.yearly-table th {
     background: #f8f9fa;
-    padding: 8px;
+    padding: 6px 4px;
     border: 1px solid #dadce0;
     font-weight: 500;
     color: #202124;
@@ -581,30 +612,47 @@ tbody tr:hover {
     position: sticky;
     top: 0;
     z-index: 10;
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.timeline-table .sticky-col {
+.timeline-table .sticky-col,
+.yearly-table .sticky-col {
     position: sticky;
     left: 0;
     background: white;
     z-index: 11;
     font-weight: 500;
+    width: 150px;
+    min-width: 150px;
+    max-width: 150px;
+    text-align: left;
 }
 
-.timeline-table thead th.sticky-col {
+.timeline-table thead th.sticky-col,
+.yearly-table thead th.sticky-col {
     background: #f8f9fa;
     z-index: 12;
 }
 
-.timeline-table td {
-    padding: 6px 8px;
+.timeline-table td,
+.yearly-table td {
+    padding: 4px 6px;
     border: 1px solid #dadce0;
     text-align: right;
     white-space: nowrap;
     font-size: 11px;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.timeline-table tbody tr:hover {
+.timeline-table tbody tr:hover,
+.yearly-table tbody tr:hover {
     background: #f8f9fa;
 }
 
@@ -612,18 +660,31 @@ tbody tr:hover {
 .timeline-memo-row {
     background: #fff8e1;
     border-top: 1px solid #dadce0;
+    height: 48px;
 }
 
 .timeline-memo-row .memo-label {
     font-weight: 500;
     color: #202124;
     background: #fff8e1;
+    height: 48px;
+    vertical-align: top;
+    min-width: 100px !important;
+    max-width: 100px !important;
+    width: 100px !important;
+}
+
+/* より具体的なセレクター */
+td.sticky-col.memo-label {
+    min-width: 100px !important;
+    max-width: 100px !important;
+    width: 100px !important;
 }
 
 .timeline-memo-row .memo-cell {
     font-size: 11px;
     color: #202124;
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 80px;
@@ -631,6 +692,12 @@ tbody tr:hover {
     cursor: pointer;
     padding: 4px 6px;
     transition: background-color 0.2s;
+    height: 48px;
+    vertical-align: top;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
 .timeline-memo-row .memo-cell:not(:empty):hover {
@@ -716,6 +783,8 @@ tbody tr:hover {
     border-radius: 8px;
     width: 90%;
     max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
     border: 1px solid #dadce0;
     box-shadow: 0 4px 16px rgba(0,0,0,0.2);
 }
@@ -994,4 +1063,264 @@ tbody tr:hover {
     .bulk-input-table-wrapper {
         overflow-x: scroll;
     }
+}
+
+/* 月別データ一覧テーブル */
+.monthly-data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.monthly-data-table thead {
+    background: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.monthly-data-table th {
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid #dadce0;
+    font-size: 12px;
+}
+
+.monthly-data-table th:first-child {
+    width: 60px;
+}
+
+.monthly-data-table th:nth-child(2) {
+    width: 70px;
+}
+
+.monthly-data-table th:nth-child(3),
+.monthly-data-table th:nth-child(4) {
+    text-align: right;
+}
+
+.monthly-data-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.monthly-data-table td:first-child {
+    font-weight: 500;
+    color: #5f6368;
+}
+
+.monthly-data-table td:nth-child(3),
+.monthly-data-table td:nth-child(4) {
+    text-align: right;
+    font-family: 'Monaco', 'Menlo', monospace;
+}
+
+.monthly-data-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+#monthlyDataTable {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* 小項目別取引明細テーブル */
+.subcategory-details-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.subcategory-details-table thead {
+    background: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.subcategory-details-table th {
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid #dadce0;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.subcategory-details-table th:nth-child(1) {
+    width: 100px;
+}
+
+.subcategory-details-table th:nth-child(2) {
+    width: 120px;
+}
+
+.subcategory-details-table th:nth-child(3) {
+    width: 120px;
+}
+
+.subcategory-details-table th:nth-child(4) {
+    width: 100px;
+    text-align: right;
+}
+
+.subcategory-details-table th:nth-child(5) {
+    width: 150px;
+}
+
+.subcategory-details-table th:nth-child(6) {
+    min-width: 200px;
+}
+
+.subcategory-details-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.subcategory-details-table td:nth-child(1) {
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 11px;
+    color: #5f6368;
+}
+
+.subcategory-details-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+#subcategoryDetailsTable {
+    max-height: 500px;
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+/* 円グラフのサイズ調整 */
+#categoryChart {
+    max-width: 300px;
+    max-height: 300px;
+    margin: 0 auto;
+}
+
+/* ソート可能なヘッダー */
+.sortable-header {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.sortable-header:hover {
+    background: #e8f0fe !important;
+    color: #1a73e8;
+}
+
+/* ========================================
+   ふるさと納税タブ
+   ======================================== */
+
+#furusato-tab {
+    padding: 12px 16px;
+    min-height: calc(100vh - 110px);
+}
+
+#furusato-tab .card {
+    padding: 0;
+    margin: 0;
+}
+
+.furusato-header {
+    margin-bottom: 10px;
+}
+
+.furusato-header h2 {
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+.furusato-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.furusato-controls label {
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.furusato-controls select {
+    padding: 6px 10px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.furusato-controls input[type="text"] {
+    padding: 6px 10px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 13px;
+    min-width: 200px;
+}
+
+.furusato-summary {
+    padding: 8px 12px;
+    background: #e8f0fe;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.furusato-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.furusato-table thead {
+    background: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.furusato-table th {
+    padding: 8px 6px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid #dadce0;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.furusato-table td {
+    padding: 8px 6px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.furusato-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 4px;
+    margin: 0 1px;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+}
+
+.btn-icon:hover {
+    background: #e0e0e0;
+}
+
+.furusato-controls .btn {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+#furusatoTableContainer {
+    width: 100%;
 }

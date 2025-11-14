@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>複数月のTopix更新</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            border-radius: 4px;
+            border: none;
+        }
+        .btn-primary {
+            background: #1a73e8;
+            color: white;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dadce0;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .success {
+            color: #0f9d58;
+        }
+        .month-section {
+            color: #1a73e8;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>複数月のTopixを更新</h1>
+    <p>以下のデータを追加します：</p>
+    <ul>
+        <li><strong>2020-08:</strong> 宮崎ミート、奈月市民税（年間払込済）、奈月国保1期</li>
+        <li><strong>2020-09:</strong> 宮崎ミート、年金、ふるさと納税</li>
+    </ul>
+
+    <button class="btn btn-primary" onclick="updateTopix()">更新実行</button>
+    <button class="btn" onclick="location.href='index.html'">アプリに戻る</button>
+
+    <div class="log" id="log"></div>
+
+    <script>
+        function log(message, isMonthHeader = false) {
+            const logDiv = document.getElementById('log');
+            const p = document.createElement('p');
+            p.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            p.className = isMonthHeader ? 'month-section' : 'success';
+            logDiv.appendChild(p);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateTopix() {
+            // 更新するデータ
+            const updates = {
+                '2020-08': ['宮崎ミート', '奈月市民税（年間払込済）', '奈月国保1期'],
+                '2020-09': ['宮崎ミート', '年金', 'ふるさと納税']
+            };
+
+            log('更新を開始します...');
+
+            // 既存のメモデータを取得
+            const existingMemos = JSON.parse(localStorage.getItem('monthlyMemos') || '{}');
+
+            let totalAdded = 0;
+            let totalSkipped = 0;
+
+            // 各月を更新
+            for (const [yearMonth, newEvents] of Object.entries(updates)) {
+                log(`\n【${yearMonth}】を更新中...`, true);
+
+                // その月のデータを取得
+                const memo = existingMemos[yearMonth] || { events: '', plans: '', notes: '' };
+
+                // 既存のイベントを配列に変換
+                const currentEvents = memo.events ? memo.events.split('\n').filter(e => e.trim()) : [];
+
+                log(`現在のTopix数: ${currentEvents.length}件`);
+
+                // 重複チェックしながら追加
+                newEvents.forEach(event => {
+                    if (!currentEvents.includes(event)) {
+                        currentEvents.push(event);
+                        log(`  ✓ 追加: ${event}`);
+                        totalAdded++;
+                    } else {
+                        log(`  - 既に存在: ${event}`);
+                        totalSkipped++;
+                    }
+                });
+
+                // データを更新
+                existingMemos[yearMonth] = {
+                    events: currentEvents.join('\n'),
+                    plans: memo.plans || '',
+                    notes: memo.notes || ''
+                };
+
+                log(`更新後のTopix数: ${currentEvents.length}件`);
+            }
+
+            // localStorageに保存
+            localStorage.setItem('monthlyMemos', JSON.stringify(existingMemos));
+
+            log(`\n完了！ 合計 ${totalAdded}件のTopixを追加しました（${totalSkipped}件はスキップ）`, true);
+
+            setTimeout(() => {
+                if (confirm('更新が完了しました。アプリを開きますか？')) {
+                    location.href = 'index.html';
+                }
+            }, 1000);
+        }
+
+        // ページ読み込み時に現在のデータを表示
+        window.onload = function() {
+            const existingMemos = JSON.parse(localStorage.getItem('monthlyMemos') || '{}');
+            const months = ['2020-08', '2020-09'];
+
+            log('現在のデータを確認中...');
+
+            months.forEach(month => {
+                log(`\n【${month}】`, true);
+                const memo = existingMemos[month] || { events: '' };
+
+                if (memo.events) {
+                    const events = memo.events.split('\n').filter(e => e.trim());
+                    log(`現在のTopix: ${events.length}件`);
+                    events.forEach(event => {
+                        log(`  - ${event}`);
+                    });
+                } else {
+                    log('現在Topixはありません');
+                }
+            });
+
+            log('\n準備完了。「更新実行」ボタンをクリックしてください。', true);
+        };
+    </script>
+</body>
+</html>

@@ -21,6 +21,7 @@
             <button class="tab-btn" data-tab="list">一覧</button>
             <button class="tab-btn" data-tab="timeline">推移</button>
             <button class="tab-btn" data-tab="analysis">分析</button>
+            <button class="tab-btn" data-tab="furusato">ふるさと納税</button>
         </div>
 
         <!-- 入力タブ -->
@@ -45,7 +46,8 @@
                                     <th>金額</th>
                                     <th>税込</th>
                                     <th>場所</th>
-                                    <th>商品名・メモ</th>
+                                    <th>商品名</th>
+                                    <th>メモ</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -83,11 +85,23 @@
                                     <td><input type="number" id="amount" min="0" placeholder="金額" required></td>
                                     <td><button type="button" class="tax-btn" id="normalTaxBtn">税込</button></td>
                                     <td><input type="text" id="place" placeholder="場所"></td>
-                                    <td><input type="text" id="description" placeholder="商品名・メモ"></td>
+                                    <td><input type="text" id="description" placeholder="商品名"></td>
+                                    <td><input type="text" id="notes" placeholder="メモ"></td>
                                     <td><button type="submit" class="btn btn-primary">記録</button></td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    <div style="margin-top: 12px; padding: 12px; background: #f8f9fa; border-radius: 4px;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="checkbox" id="normalRepeatMonthly" style="margin-right: 8px;">
+                            <span style="font-size: 13px;">毎月繰り返す</span>
+                        </label>
+                        <div id="normalRepeatOptions" style="display: none; margin-top: 8px; padding-left: 28px;">
+                            <label for="normalRepeatMonths" style="font-size: 13px; color: #5f6368;">繰り返し回数</label>
+                            <input type="number" id="normalRepeatMonths" min="1" max="60" value="12" style="width: 80px; margin-left: 8px;">
+                            <span style="font-size: 13px; color: #5f6368; margin-left: 4px;">ヶ月</span>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -113,19 +127,30 @@
                     <button id="addRowBtn" class="btn btn-secondary">+ 1行追加</button>
                     <button id="add5RowsBtn" class="btn btn-secondary">+ 5行追加</button>
                     <button id="add10RowsBtn" class="btn btn-secondary">+ 10行追加</button>
-                    <button id="saveBulkBtn" class="btn btn-primary">まとめて記録</button>
+                    <div style="margin-left: auto; display: flex; align-items: center; gap: 12px;">
+                        <label style="display: flex; align-items: center; cursor: pointer; font-size: 13px;">
+                            <input type="checkbox" id="bulkRepeatMonthly" style="margin-right: 6px;">
+                            <span>毎月繰り返す</span>
+                        </label>
+                        <div id="bulkRepeatOptions" style="display: none;">
+                            <input type="number" id="bulkRepeatMonths" min="1" max="60" value="12" style="width: 60px;">
+                            <span style="font-size: 13px; color: #5f6368; margin-left: 4px;">ヶ月</span>
+                        </div>
+                        <button id="saveBulkBtn" class="btn btn-primary">まとめて記録</button>
+                    </div>
                 </div>
                 <div class="bulk-input-table-wrapper">
                     <table class="bulk-input-table">
                         <thead>
                             <tr>
                                 <th>日付</th>
-                                <th>カテゴリ</th>
-                                <th>小項目</th>
+                                <th>場所</th>
                                 <th>金額</th>
                                 <th>税込</th>
-                                <th>場所</th>
-                                <th>商品名・メモ</th>
+                                <th>商品名</th>
+                                <th>カテゴリ</th>
+                                <th>小項目</th>
+                                <th>メモ</th>
                                 <th>削除</th>
                             </tr>
                         </thead>
@@ -143,6 +168,8 @@
                 <div class="list-header">
                     <h2>支出一覧</h2>
                     <div class="filter-group">
+                        <label for="expenseSearch">検索</label>
+                        <input type="text" id="expenseSearch" placeholder="商品名・場所・メモ・カテゴリ" class="filter-search">
                         <label for="dateRangeType">期間</label>
                         <select id="dateRangeType" class="filter-select">
                             <option value="all">全期間</option>
@@ -161,18 +188,19 @@
                     </div>
                 </div>
                 <div class="total-display">
-                    <h3>表示期間の合計: <span id="displayTotal">0</span>円</h3>
+                    <h3><span id="filterInfo">表示期間</span>の合計: <span id="displayTotal">0</span>円 <span id="filterCount"></span></h3>
                 </div>
                 <div class="table-container">
                     <table id="expenseTable">
                         <thead>
                             <tr>
                                 <th class="sortable" data-sort="date">日付</th>
+                                <th class="sortable" data-sort="place">場所</th>
                                 <th class="sortable" data-sort="category">カテゴリ</th>
                                 <th class="sortable" data-sort="subcategory">小項目</th>
                                 <th class="sortable" data-sort="amount">金額</th>
-                                <th class="sortable" data-sort="place">場所</th>
-                                <th class="sortable" data-sort="description">商品名・メモ</th>
+                                <th class="sortable" data-sort="description">商品名</th>
+                                <th class="sortable" data-sort="notes">メモ</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
@@ -294,16 +322,103 @@
                 <div id="categoryStats"></div>
             </div>
 
+            <div class="card" id="yearlyTableCard" style="display: none;">
+                <h2 id="yearlyTableTitle">年別カテゴリ推移</h2>
+                <div class="yearly-table-wrapper">
+                    <table id="yearlyTable" class="yearly-table">
+                        <thead id="yearlyTableHead">
+                            <!-- ヘッダーが動的に生成されます -->
+                        </thead>
+                        <tbody id="yearlyTableBody">
+                            <!-- データが動的に生成されます -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 年度メモ -->
+            <div class="card" id="yearMemoCard" style="display: none;">
+                <h2 id="yearMemoTitle">年度メモ</h2>
+                <div class="memo-section">
+                    <textarea id="yearMemoText" placeholder="この年度についてメモを記録..." rows="5"></textarea>
+                    <button id="saveYearMemoBtn" class="btn btn-primary">保存</button>
+                </div>
+            </div>
+
             <div class="charts-container">
                 <div class="card">
                     <h2 id="monthlyChartTitle">月別推移</h2>
                     <canvas id="monthlyChart"></canvas>
                 </div>
-                <div class="card">
-                    <h2 id="categoryChartTitle">カテゴリ別内訳</h2>
-                    <canvas id="categoryChart"></canvas>
+            </div>
+
+            <div class="card">
+                <h2 id="monthlyDataTitle">月別データ一覧</h2>
+                <div id="monthlyDataTable"></div>
+            </div>
+
+            <div class="card" id="subcategoryDetailsCard" style="display: none;">
+                <h2 id="subcategoryDetailsTitle">取引明細</h2>
+                <div id="subcategoryDetailsTable"></div>
+            </div>
+        </div>
+
+        <!-- ふるさと納税タブ -->
+        <div id="furusato-tab" class="tab-content">
+            <div class="furusato-header">
+                <h2>ふるさと納税管理</h2>
+                <div class="furusato-controls">
+                    <label for="furusatoYear">年度</label>
+                    <select id="furusatoYear">
+                        <!-- JavaScriptで動的に生成 -->
+                    </select>
+                    <label for="furusatoSearch">検索</label>
+                    <input type="text" id="furusatoSearch" placeholder="品物・申請先・自治体">
+                    <button id="addFurusatoBtn" class="btn btn-primary">新規追加</button>
+                    <button id="importFurusatoBtn" class="btn btn-secondary">支出データからインポート</button>
                 </div>
             </div>
+
+            <div class="card">
+                <div id="furusatoTableContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ふるさと納税 編集モーダル -->
+    <div id="furusatoModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="furusatoModalClose">&times;</span>
+            <h2 id="furusatoModalTitle">ふるさと納税を追加</h2>
+            <form id="furusatoForm">
+                <input type="hidden" id="furusatoId">
+                <div class="form-group">
+                    <label for="furusatoYear">年度</label>
+                    <select id="furusatoYearInput" required>
+                        <!-- JavaScriptで動的に生成 -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="furusatoAmount">金額</label>
+                    <input type="number" id="furusatoAmount" min="0" step="1000" required>
+                </div>
+                <div class="form-group">
+                    <label for="furusatoItem">品物</label>
+                    <input type="text" id="furusatoItem" required>
+                </div>
+                <div class="form-group">
+                    <label for="furusatoApplicant">申請先</label>
+                    <input type="text" id="furusatoApplicant" required>
+                </div>
+                <div class="form-group">
+                    <label for="furusatoMunicipality">自治体（任意）</label>
+                    <input type="text" id="furusatoMunicipality">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="button" class="btn" id="cancelFurusatoBtn">キャンセル</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -356,8 +471,23 @@
                     <input type="text" id="editPlace">
                 </div>
                 <div class="form-group">
-                    <label for="editDescription">商品名・メモ</label>
+                    <label for="editDescription">商品名</label>
                     <input type="text" id="editDescription">
+                </div>
+                <div class="form-group">
+                    <label for="editNotes">メモ</label>
+                    <input type="text" id="editNotes">
+                </div>
+                <div class="form-group" style="border-top: 1px solid #e0e0e0; padding-top: 16px; margin-top: 16px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="editRepeatMonthly" style="margin-right: 8px;">
+                        <span>毎月繰り返す</span>
+                    </label>
+                    <div id="editRepeatOptions" style="display: none; margin-top: 12px; padding-left: 28px;">
+                        <label for="editRepeatMonths" style="font-size: 13px; color: #5f6368;">繰り返し回数</label>
+                        <input type="number" id="editRepeatMonths" min="1" max="60" value="12" style="width: 80px; margin-left: 8px;">
+                        <span style="font-size: 13px; color: #5f6368; margin-left: 4px;">ヶ月</span>
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary">更新する</button>
             </form>

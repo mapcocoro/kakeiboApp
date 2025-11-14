@@ -1,0 +1,14 @@
+# macOS
+.DS_Store
+
+# バックアップファイル
+*.backup
+
+# CSVファイル（エクスポートデータ）
+*.csv
+
+# デバッグ用ファイル
+debug-*.html
+clear-data.html
+auto-import.html
+import-topix.html

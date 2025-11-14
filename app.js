@@ -1,4 +1,32 @@
 // ========================================
+// 状態管理
+// ========================================
+
+class StateManager {
+    constructor() {
+        this.stateKey = 'appState';
+    }
+
+    // 状態を保存
+    saveState(state) {
+        localStorage.setItem(this.stateKey, JSON.stringify(state));
+    }
+
+    // 状態を読み込み
+    loadState() {
+        const data = localStorage.getItem(this.stateKey);
+        return data ? JSON.parse(data) : null;
+    }
+
+    // 特定のキーの状態を更新
+    updateState(key, value) {
+        const state = this.loadState() || {};
+        state[key] = value;
+        this.saveState(state);
+    }
+}
+
+// ========================================
 // データ管理
 // ========================================
 
@@ -7,6 +35,7 @@ class ExpenseManager {
         this.expenses = this.loadExpenses();
         this.reports = this.loadReports();
         this.memos = this.loadMemos();
+        this.yearMemos = this.loadYearMemos();
     }
 
     // localStorageからデータを読み込み
@@ -59,13 +88,38 @@ class ExpenseManager {
 
     // 月のメモを取得
     getMemo(yearMonth) {
-        return this.memos[yearMonth] || { events: '', plans: '' };
+        // 毎回localStorageから最新データを読み込む
+        const memos = this.loadMemos();
+        return memos[yearMonth] || { events: '', plans: '' };
     }
 
     // 月のメモを保存
     saveMemo(yearMonth, events, plans) {
         this.memos[yearMonth] = { events, plans };
         this.saveMemos();
+    }
+
+    // 年度メモを読み込み
+    loadYearMemos() {
+        const data = localStorage.getItem('yearMemos');
+        return data ? JSON.parse(data) : {};
+    }
+
+    // 年度メモを保存
+    saveYearMemosToStorage() {
+        localStorage.setItem('yearMemos', JSON.stringify(this.yearMemos));
+    }
+
+    // 年度メモを取得
+    getYearMemo(year) {
+        const memos = this.loadYearMemos();
+        return memos[year] || '';
+    }
+
+    // 年度メモを保存
+    saveYearMemo(year, memo) {
+        this.yearMemos[year] = memo;
+        this.saveYearMemosToStorage();
     }
 
     // localStorageにデータを保存
@@ -92,6 +146,10 @@ class ExpenseManager {
         expense.id = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9);
         this.expenses.push(expense);
         this.saveExpenses();
+
+        // ふるさと納税への自動同期
+        this.syncToFurusato(expense);
+
         return expense;
     }
 
@@ -100,6 +158,9 @@ class ExpenseManager {
         expenses.forEach((expense, index) => {
             expense.id = Date.now().toString() + '_' + index + '_' + Math.random().toString(36).substr(2, 9);
             this.expenses.push(expense);
+
+            // ふるさと納税への自動同期
+            this.syncToFurusato(expense);
         });
         this.saveExpenses(); // 最後に1回だけ保存
     }
@@ -108,8 +169,13 @@ class ExpenseManager {
     updateExpense(id, updatedData) {
         const index = this.expenses.findIndex(e => e.id === id);
         if (index !== -1) {
+            const oldExpense = { ...this.expenses[index] };
             this.expenses[index] = { ...this.expenses[index], ...updatedData };
             this.saveExpenses();
+
+            // ふるさと納税への自動同期（更新後のデータ）
+            this.syncToFurusato(this.expenses[index], oldExpense);
+
             return true;
         }
         return false;
@@ -117,6 +183,12 @@ class ExpenseManager {
 
     // 支出を削除
     deleteExpense(id) {
+        // 削除前のデータを取得してふるさと納税から削除
+        const expenseToDelete = this.expenses.find(e => e.id === id);
+        if (expenseToDelete) {
+            this.removeFurusatoSync(expenseToDelete);
+        }
+
         this.expenses = this.expenses.filter(e => e.id !== id);
         this.saveExpenses();
     }
@@ -163,6 +235,103 @@ class ExpenseManager {
         });
         return monthlyData;
     }
+
+    // ふるさと納税への自動同期
+    syncToFurusato(expense, oldExpense = null) {
+        // 小項目に「ふるさと納税」が含まれているかチェック
+        const isFurusato = expense.subcategory && expense.subcategory.includes('ふるさと納税');
+        const wasOldFurusato = oldExpense && oldExpense.subcategory && oldExpense.subcategory.includes('ふるさと納税');
+
+        if (!isFurusato && !wasOldFurusato) {
+            // ふるさと納税ではない場合は何もしない
+            return;
+        }
+
+        // FurusatoManagerのインスタンスを取得（グローバル変数から）
+        if (typeof furusatoManager === 'undefined') {
+            console.warn('FurusatoManagerが初期化されていません');
+            return;
+        }
+
+        // 更新の場合：古いデータがふるさと納税で、新しいデータがふるさと納税でない場合は削除
+        if (oldExpense && wasOldFurusato && !isFurusato) {
+            this.removeFurusatoSync(oldExpense);
+            return;
+        }
+
+        // 更新の場合：古いデータを削除してから新しいデータを追加
+        if (oldExpense && wasOldFurusato) {
+            this.removeFurusatoSync(oldExpense);
+        }
+
+        // ふるさと納税データに変換
+        const date = new Date(expense.date);
+        const furusatoData = {
+            year: date.getFullYear().toString(),
+            amount: parseInt(expense.amount),
+            item: expense.description || '（商品名なし）',
+            applicant: expense.place || '（申請先不明）',
+            municipality: ''
+        };
+
+        // 重複チェック
+        const existingData = furusatoManager.getAll();
+        const isDuplicate = existingData.some(existing =>
+            existing.year === furusatoData.year &&
+            parseInt(existing.amount) === parseInt(furusatoData.amount) &&
+            existing.item === furusatoData.item &&
+            existing.applicant === furusatoData.applicant
+        );
+
+        if (!isDuplicate) {
+            furusatoManager.add(furusatoData);
+            console.log('ふるさと納税に自動追加:', furusatoData);
+
+            // ふるさと納税UIを更新（グローバル変数から）
+            if (typeof furusatoUI !== 'undefined') {
+                furusatoUI.render();
+            }
+        }
+    }
+
+    // ふるさと納税から削除（同期）
+    removeFurusatoSync(expense) {
+        // 小項目に「ふるさと納税」が含まれているかチェック
+        if (!expense.subcategory || !expense.subcategory.includes('ふるさと納税')) {
+            return;
+        }
+
+        // FurusatoManagerのインスタンスを取得
+        if (typeof furusatoManager === 'undefined') {
+            console.warn('FurusatoManagerが初期化されていません');
+            return;
+        }
+
+        // 該当するふるさと納税データを検索して削除
+        const date = new Date(expense.date);
+        const year = date.getFullYear().toString();
+        const amount = parseInt(expense.amount);
+        const item = expense.description || '（商品名なし）';
+        const applicant = expense.place || '（申請先不明）';
+
+        const existingData = furusatoManager.getAll();
+        const toDelete = existingData.find(existing =>
+            existing.year === year &&
+            parseInt(existing.amount) === amount &&
+            existing.item === item &&
+            existing.applicant === applicant
+        );
+
+        if (toDelete) {
+            furusatoManager.delete(toDelete.id);
+            console.log('ふるさと納税から自動削除:', toDelete);
+
+            // ふるさと納税UIを更新
+            if (typeof furusatoUI !== 'undefined') {
+                furusatoUI.render();
+            }
+        }
+    }
 }
 
 // ========================================
@@ -172,6 +341,7 @@ class ExpenseManager {
 class UI {
     constructor(manager) {
         this.manager = manager;
+        this.stateManager = new StateManager();
         this.monthlyChart = null;
         this.categoryChart = null;
 
@@ -206,6 +376,8 @@ class UI {
         this.currentSort = { column: 'date', direction: 'desc' }; // デフォルトは日付降順
         this.displayLimit = 100; // 初期表示件数
         this.displayOffset = 0; // 表示開始位置
+        this.filteredExpenses = []; // フィルター適用後のデータ（一覧タブ用）
+        this.analysisData = null; // 分析データ（分析タブ用）
 
         // UIセットアップ
         this.setupEventListeners();
@@ -215,6 +387,12 @@ class UI {
         this.populateTimelineYearSelects();
         this.loadSavedReportsList();
         this.setDefaultMemoMonth();
+
+        // 保存された状態を復元（タブ復元前に実行）
+        this.restoreFilterState();
+
+        // タブを復元（フィルター復元後に実行）
+        this.restoreActiveTab();
 
         // 初期表示
         this.renderExpenseList();
@@ -237,28 +415,46 @@ class UI {
         // 期間タイプ変更
         document.getElementById('dateRangeType').addEventListener('change', (e) => {
             this.handleDateRangeTypeChange(e.target.value);
+            this.stateManager.updateState('dateRangeType', e.target.value);
+        });
+
+        // 検索ボックス
+        document.getElementById('expenseSearch').addEventListener('input', (e) => {
+            this.renderExpenseList(true); // フィルター変更時は表示件数リセット
         });
 
         // 月フィルター
-        document.getElementById('monthFilter').addEventListener('change', () => {
+        document.getElementById('monthFilter').addEventListener('change', (e) => {
             this.renderExpenseList(true); // フィルター変更時は表示件数リセット
+            this.stateManager.updateState('monthFilter', e.target.value);
         });
 
         // カスタム期間の適用ボタン
         document.getElementById('applyFilter').addEventListener('click', () => {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            this.stateManager.updateState('startDate', startDate);
+            this.stateManager.updateState('endDate', endDate);
             this.renderExpenseList(true);
         });
 
         // 開始日・終了日の変更（Enterキーで適用）
         document.getElementById('startDate').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.renderExpenseList(true);
+            if (e.key === 'Enter') {
+                this.stateManager.updateState('startDate', e.target.value);
+                this.renderExpenseList(true);
+            }
         });
         document.getElementById('endDate').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.renderExpenseList(true);
+            if (e.key === 'Enter') {
+                this.stateManager.updateState('endDate', e.target.value);
+                this.renderExpenseList(true);
+            }
         });
 
         // フィルタークリア
         document.getElementById('clearFilter').addEventListener('click', () => {
+            document.getElementById('expenseSearch').value = '';
             document.getElementById('dateRangeType').value = 'all';
             document.getElementById('monthFilter').value = '';
             document.getElementById('startDate').value = '';
@@ -279,6 +475,10 @@ class UI {
 
         // 推移タブ - 更新ボタン
         document.getElementById('updateTimelineBtn').addEventListener('click', () => {
+            const startYear = document.getElementById('timelineStartYear').value;
+            const endYear = document.getElementById('timelineEndYear').value;
+            this.stateManager.updateState('timelineStartYear', startYear);
+            this.stateManager.updateState('timelineEndYear', endYear);
             this.renderTimeline();
         });
 
@@ -295,14 +495,17 @@ class UI {
         // 分析期間タイプ変更
         document.getElementById('analysisDateRangeType').addEventListener('change', (e) => {
             this.handleAnalysisDateRangeTypeChange(e.target.value);
+            this.stateManager.updateState('analysisDateRangeType', e.target.value);
         });
 
         // 分析年月変更
-        document.getElementById('analysisYear').addEventListener('change', () => {
+        document.getElementById('analysisYear').addEventListener('change', (e) => {
+            this.stateManager.updateState('analysisYear', e.target.value);
             this.updateAnalysis();
         });
 
-        document.getElementById('analysisMonth').addEventListener('change', () => {
+        document.getElementById('analysisMonth').addEventListener('change', (e) => {
+            this.stateManager.updateState('analysisMonth', e.target.value);
             this.updateAnalysis();
         });
 
@@ -318,12 +521,19 @@ class UI {
         });
 
         // 分析カスタム期間変更
-        document.getElementById('analysisStartDate').addEventListener('change', () => {
+        document.getElementById('analysisStartDate').addEventListener('change', (e) => {
+            this.stateManager.updateState('analysisStartDate', e.target.value);
             this.updateAnalysis();
         });
 
-        document.getElementById('analysisEndDate').addEventListener('change', () => {
+        document.getElementById('analysisEndDate').addEventListener('change', (e) => {
+            this.stateManager.updateState('analysisEndDate', e.target.value);
             this.updateAnalysis();
+        });
+
+        // 年度メモ保存ボタン
+        document.getElementById('saveYearMemoBtn').addEventListener('click', () => {
+            this.saveYearMemo();
         });
 
         // エクスポート・インポート
@@ -402,6 +612,24 @@ class UI {
                 this.sortExpenseList(sortColumn);
             });
         });
+
+        // 通常入力: 毎月繰り返すチェックボックス
+        document.getElementById('normalRepeatMonthly').addEventListener('change', (e) => {
+            const options = document.getElementById('normalRepeatOptions');
+            options.style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // 一括入力: 毎月繰り返すチェックボックス
+        document.getElementById('bulkRepeatMonthly').addEventListener('change', (e) => {
+            const options = document.getElementById('bulkRepeatOptions');
+            options.style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // 編集モーダル: 毎月繰り返すチェックボックス
+        document.getElementById('editRepeatMonthly').addEventListener('change', (e) => {
+            const options = document.getElementById('editRepeatOptions');
+            options.style.display = e.target.checked ? 'block' : 'none';
+        });
     }
 
     // タブ切り替え
@@ -432,9 +660,6 @@ class UI {
                 }
             });
         });
-
-        // リロード時に前回のタブを復元
-        this.restoreActiveTab();
     }
 
     // アクティブタブを復元
@@ -445,6 +670,53 @@ class UI {
             if (tabBtn) {
                 tabBtn.click();
             }
+        }
+    }
+
+    // フィルター状態を復元
+    restoreFilterState() {
+        const state = this.stateManager.loadState();
+        if (!state) return;
+
+        // 一覧タブのフィルター復元
+        if (state.dateRangeType) {
+            document.getElementById('dateRangeType').value = state.dateRangeType;
+            this.handleDateRangeTypeChange(state.dateRangeType);
+        }
+        if (state.monthFilter) {
+            document.getElementById('monthFilter').value = state.monthFilter;
+        }
+        if (state.startDate) {
+            document.getElementById('startDate').value = state.startDate;
+        }
+        if (state.endDate) {
+            document.getElementById('endDate').value = state.endDate;
+        }
+
+        // 推移タブの年度復元
+        if (state.timelineStartYear) {
+            document.getElementById('timelineStartYear').value = state.timelineStartYear;
+        }
+        if (state.timelineEndYear) {
+            document.getElementById('timelineEndYear').value = state.timelineEndYear;
+        }
+
+        // 分析タブの設定復元
+        if (state.analysisDateRangeType) {
+            document.getElementById('analysisDateRangeType').value = state.analysisDateRangeType;
+            this.handleAnalysisDateRangeTypeChange(state.analysisDateRangeType);
+        }
+        if (state.analysisYear) {
+            document.getElementById('analysisYear').value = state.analysisYear;
+        }
+        if (state.analysisMonth) {
+            document.getElementById('analysisMonth').value = state.analysisMonth;
+        }
+        if (state.analysisStartDate) {
+            document.getElementById('analysisStartDate').value = state.analysisStartDate;
+        }
+        if (state.analysisEndDate) {
+            document.getElementById('analysisEndDate').value = state.analysisEndDate;
         }
     }
 
@@ -459,8 +731,22 @@ class UI {
         const select = document.getElementById('analysisYear');
         const currentYear = new Date().getFullYear();
 
-        // 2020年から現在年まで
-        for (let year = 2020; year <= currentYear; year++) {
+        // データから最小年と最大年を取得
+        const expenses = this.manager.getAllExpenses();
+        let minYear = 2020;
+        let maxYear = currentYear;
+        if (expenses.length > 0) {
+            const years = expenses.map(e => new Date(e.date).getFullYear());
+            minYear = Math.min(...years, 2020); // 最小でも2020年から
+            maxYear = Math.max(...years, currentYear);
+        }
+
+        // 未来10年まで拡張
+        const futureYear = currentYear + 10;
+        maxYear = Math.max(maxYear, futureYear);
+
+        // 最小年から未来年まで
+        for (let year = minYear; year <= maxYear; year++) {
             const option = document.createElement('option');
             option.value = year;
             option.textContent = `${year}年`;
@@ -477,16 +763,22 @@ class UI {
         const endSelect = document.getElementById('timelineEndYear');
         const currentYear = new Date().getFullYear();
 
-        // データから最小年を取得
+        // データから最小年と最大年を取得
         const expenses = this.manager.getAllExpenses();
         let minYear = 2020;
+        let maxYear = currentYear;
         if (expenses.length > 0) {
             const years = expenses.map(e => new Date(e.date).getFullYear());
-            minYear = Math.min(...years);
+            minYear = Math.min(...years, 2020); // 最小でも2020年から
+            maxYear = Math.max(...years, currentYear);
         }
 
-        // 最小年から現在年まで
-        for (let year = minYear; year <= currentYear; year++) {
+        // 未来10年まで拡張
+        const futureYear = currentYear + 10;
+        maxYear = Math.max(maxYear, futureYear);
+
+        // 最小年から未来年まで
+        for (let year = minYear; year <= maxYear; year++) {
             const option1 = document.createElement('option');
             option1.value = year;
             option1.textContent = `${year}年`;
@@ -518,18 +810,38 @@ class UI {
             subcategory: document.getElementById('subcategory').value,
             amount: document.getElementById('amount').value,
             place: document.getElementById('place').value,
-            description: document.getElementById('description').value
+            description: document.getElementById('description').value,
+            notes: document.getElementById('notes').value
         };
 
-        this.manager.addExpense(expense);
+        // 毎月繰り返すチェックの確認
+        const repeatCheckbox = document.getElementById('normalRepeatMonthly');
+        const repeatMonths = parseInt(document.getElementById('normalRepeatMonths').value) || 1;
+
+        if (repeatCheckbox.checked && repeatMonths > 1) {
+            // 複数月分の支出を作成
+            const baseDate = new Date(expense.date);
+            for (let i = 0; i < repeatMonths; i++) {
+                const newDate = new Date(baseDate);
+                newDate.setMonth(baseDate.getMonth() + i);
+
+                const repeatedExpense = {
+                    ...expense,
+                    date: newDate.toISOString().split('T')[0]
+                };
+                this.manager.addExpense(repeatedExpense);
+            }
+            this.showMessage(`${repeatMonths}ヶ月分の支出を記録しました`);
+        } else {
+            this.manager.addExpense(expense);
+            this.showMessage('支出を記録しました');
+        }
+
         this.renderExpenseList();
 
         // フォームをリセット
         document.getElementById('expenseForm').reset();
         this.setDefaultDate();
-
-        // 成功メッセージ
-        this.showMessage('支出を記録しました');
     }
 
     // 期間タイプ変更時の表示切り替え
@@ -596,8 +908,29 @@ class UI {
                 console.log(`フィルター後: ${expenses.length}件`);
             }
 
+            // 検索フィルター適用
+            const searchText = document.getElementById('expenseSearch').value.toLowerCase().trim();
+            if (searchText) {
+                expenses = expenses.filter(e => {
+                    const description = (e.description || '').toLowerCase();
+                    const place = (e.place || '').toLowerCase();
+                    const notes = (e.notes || '').toLowerCase();
+                    const category = (e.category || '').toLowerCase();
+                    const subcategory = (e.subcategory || '').toLowerCase();
+                    return description.includes(searchText) ||
+                           place.includes(searchText) ||
+                           notes.includes(searchText) ||
+                           category.includes(searchText) ||
+                           subcategory.includes(searchText);
+                });
+                console.log(`検索フィルター後: ${expenses.length}件 (検索: "${searchText}")`);
+            }
+
             // ソート適用
             expenses = this.applySortToExpenses(expenses);
+
+            // フィルター適用後のデータを保存（エクスポート用）
+            this.filteredExpenses = expenses;
 
             // ヘッダーのソート表示を更新
             this.updateSortIndicators();
@@ -605,6 +938,12 @@ class UI {
             // 合計計算（全体）
             const total = expenses.reduce((sum, e) => sum + parseInt(e.amount || 0), 0);
             document.getElementById('displayTotal').textContent = total.toLocaleString();
+
+            // フィルター情報を更新
+            const filterInfo = searchText ? `検索結果（"${searchText}"）` : '表示期間';
+            const filterCount = searchText ? `(${expenses.length}件)` : '';
+            document.getElementById('filterInfo').textContent = filterInfo;
+            document.getElementById('filterCount').textContent = filterCount;
 
             // 表示件数を制限
             const displayExpenses = expenses.slice(0, this.displayLimit);
@@ -619,11 +958,12 @@ class UI {
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${expense.date || '-'}</td>
+                        <td>${expense.place || '-'}</td>
                         <td><span class="badge" data-category="${expense.category || ''}">${expense.category || '-'}</span></td>
                         <td>${expense.subcategory || '-'}</td>
                         <td>${parseInt(expense.amount || 0).toLocaleString()}円</td>
-                        <td>${expense.place || '-'}</td>
                         <td>${expense.description || '-'}</td>
+                        <td>${expense.notes || '-'}</td>
                         <td class="action-buttons">
                             <button class="btn btn-edit" onclick="ui.openEditModal('${expense.id}')">編集</button>
                             <button class="btn btn-danger" onclick="ui.deleteExpense('${expense.id}')">削除</button>
@@ -714,6 +1054,7 @@ class UI {
                 case 'subcategory':
                 case 'place':
                 case 'description':
+                case 'notes':
                     aVal = (a[column] || '').toLowerCase();
                     bVal = (b[column] || '').toLowerCase();
                     break;
@@ -759,6 +1100,7 @@ class UI {
         document.getElementById('editAmount').value = expense.amount;
         document.getElementById('editPlace').value = expense.place || '';
         document.getElementById('editDescription').value = expense.description || '';
+        document.getElementById('editNotes').value = expense.notes || '';
 
         document.getElementById('editModal').style.display = 'block';
     }
@@ -777,13 +1119,37 @@ class UI {
             subcategory: document.getElementById('editSubcategory').value,
             amount: document.getElementById('editAmount').value,
             place: document.getElementById('editPlace').value,
-            description: document.getElementById('editDescription').value
+            description: document.getElementById('editDescription').value,
+            notes: document.getElementById('editNotes').value
         };
 
+        // 現在のデータを更新
         this.manager.updateExpense(id, updatedData);
+
+        // 毎月繰り返すチェックの確認
+        const repeatCheckbox = document.getElementById('editRepeatMonthly');
+        const repeatMonths = parseInt(document.getElementById('editRepeatMonths').value) || 1;
+
+        if (repeatCheckbox.checked && repeatMonths > 1) {
+            // 追加で繰り返し分を作成（2ヶ月目から）
+            const baseDate = new Date(updatedData.date);
+            for (let i = 1; i < repeatMonths; i++) {
+                const newDate = new Date(baseDate);
+                newDate.setMonth(baseDate.getMonth() + i);
+
+                const repeatedExpense = {
+                    ...updatedData,
+                    date: newDate.toISOString().split('T')[0]
+                };
+                this.manager.addExpense(repeatedExpense);
+            }
+            this.showMessage(`支出を更新し、${repeatMonths - 1}ヶ月分を追加しました`);
+        } else {
+            this.showMessage('支出を更新しました');
+        }
+
         this.renderExpenseList();
         this.closeModal();
-        this.showMessage('支出を更新しました');
     }
 
     // 支出削除
@@ -891,26 +1257,61 @@ class UI {
             }
         });
 
-        // テーブルヘッダーを生成
+        // テーブルヘッダーを生成（ソート可能）
         const thead = document.getElementById('timelineTableHead');
         thead.innerHTML = `
             <tr>
-                <th class="sticky-col">カテゴリ</th>
-                ${months.map(m => `<th>${m.year.toString().substring(2)}.${String(m.month).padStart(2, '0')}</th>`).join('')}
+                <th class="sticky-col sortable-header" data-reset="true" title="クリックで元の順序に戻す" style="cursor: pointer;">カテゴリ</th>
+                ${months.map((m, idx) => `<th class="sortable-header" data-month-index="${idx}" title="クリックでソート">${m.year.toString().substring(2)}.${String(m.month).padStart(2, '0')}</th>`).join('')}
             </tr>
         `;
+
+        // カテゴリヘッダーにリセットイベントを追加
+        const categoryHeader = thead.querySelector('th[data-reset="true"]');
+        categoryHeader.addEventListener('click', () => {
+            this.renderTimeline(); // 元の順序で再描画
+        });
+
+        // 月ヘッダーにソートイベントを追加
+        thead.querySelectorAll('.sortable-header[data-month-index]').forEach(th => {
+            th.addEventListener('click', () => {
+                const monthIndex = parseInt(th.getAttribute('data-month-index'));
+                this.sortTimelineByMonth(categories, data, months, monthIndex);
+            });
+        });
 
         // テーブルボディを生成
         const tbody = document.getElementById('timelineTableBody');
         tbody.innerHTML = '';
 
+        // テーブル自体にtable-layout: fixedを設定
+        const table = tbody.closest('table');
+        if (table) {
+            table.style.tableLayout = 'fixed';
+            table.style.width = 'max-content';
+        }
+
         categories.forEach(category => {
             const row = document.createElement('tr');
+
+            // その行の最大値を見つける
+            const amounts = months.map(m => data[category][m.key]);
+            const maxAmount = Math.max(...amounts);
+
             const cells = months.map(m => {
                 const amount = data[category][m.key];
                 const displayAmount = amount > 0 ? `¥${amount.toLocaleString()}` : '';
-                const bgColor = amount > 0 ? this.getCategoryColor(category) : '';
-                return `<td style="background:${bgColor}">${displayAmount}</td>`;
+
+                if (amount > 0 && maxAmount > 0) {
+                    // 金額の比率を計算（最大値に対する割合）
+                    const ratio = amount / maxAmount;
+                    // 比率に応じて色の濃さを調整（0.3〜1.0）
+                    const alpha = 0.3 + (ratio * 0.7);
+                    const bgColor = this.getCategoryColorWithAlpha(category, alpha);
+                    return `<td style="background:${bgColor}">${displayAmount}</td>`;
+                } else {
+                    return `<td>${displayAmount}</td>`;
+                }
             });
 
             row.innerHTML = `
@@ -934,31 +1335,78 @@ class UI {
         `;
         tbody.appendChild(totalRow);
 
-        // 出来事行
-        const memoRow = document.createElement('tr');
-        memoRow.className = 'timeline-memo-row';
-        const memoCells = months.map((m, index) => {
+        // 出来事行（複数行対応）
+        // 各月の出来事を配列として取得
+        const monthsEvents = months.map(m => {
             const memo = this.manager.getMemo(m.key);
+            console.log(`Topix取得: ${m.key}`, memo);
             const events = memo.events ? memo.events.trim() : '';
-
-            if (events) {
-                // 最初の10文字だけ表示
-                const firstLine = events.split('\n')[0]; // 最初の行を取得
-                const preview = firstLine.length > 10 ? firstLine.substring(0, 10) + '...' : firstLine;
-
-                // HTML属性用に改行を&#10;に変換
-                const titleText = this.escapeHtml(events).replace(/\n/g, '&#10;');
-
-                return `<td class="memo-cell" title="${titleText}" data-memo="${this.escapeHtml(events)}" data-month="${m.year}年${m.month}月" onclick="ui.showMemoDetail(this)">${this.escapeHtml(preview)}</td>`;
-            } else {
-                return `<td class="memo-cell"></td>`;
-            }
+            return events ? events.split('\n').filter(e => e.trim()).slice(0, 10) : [];
         });
-        memoRow.innerHTML = `
-            <td class="sticky-col memo-label">出来事</td>
-            ${memoCells.join('')}
-        `;
-        tbody.appendChild(memoRow);
+
+        console.log('monthsEvents配列:', monthsEvents);
+        console.log('months配列の長さ:', months.length);
+        console.log('monthsEvents配列の長さ:', monthsEvents.length);
+
+        // 常に10行のTopix行を作成
+        const topixRowCount = 10;
+        console.log('Topix行数:', topixRowCount);
+
+        // 10行のTopix行を作成
+        for (let eventIndex = 0; eventIndex < topixRowCount; eventIndex++) {
+            const memoRow = document.createElement('tr');
+            memoRow.className = 'timeline-memo-row';
+            memoRow.style.display = 'table-row';
+
+            // 左端のTopixラベルセルを追加
+            const labelCell = document.createElement('td');
+            labelCell.className = 'memo-label';
+            labelCell.textContent = 'Topix';
+            // 直接スタイルを適用
+            labelCell.style.minWidth = '100px';
+            labelCell.style.maxWidth = '100px';
+            labelCell.style.width = '100px';
+            labelCell.style.position = 'sticky';
+            labelCell.style.left = '0';
+            labelCell.style.backgroundColor = '#fff8e1';
+            labelCell.style.zIndex = '10';
+            labelCell.style.fontWeight = '500';
+            labelCell.style.color = '#202124';
+            labelCell.style.display = 'table-cell';
+            labelCell.style.boxSizing = 'border-box';
+            labelCell.style.padding = '8px';
+            memoRow.appendChild(labelCell);
+
+            // 各月のセルを追加
+            months.forEach((m, monthIndex) => {
+                const events = monthsEvents[monthIndex];
+                const event = events ? events[eventIndex] : null;
+
+                const cell = document.createElement('td');
+                cell.className = 'memo-cell';
+                // 各セルに幅を設定
+                cell.style.minWidth = '80px';
+                cell.style.width = '80px';
+                cell.style.display = 'table-cell';
+                cell.style.boxSizing = 'border-box';
+                cell.style.padding = '8px';
+
+                if (event && event.trim()) {
+                    const preview = event.length > 15 ? event.substring(0, 15) + '...' : event;
+                    cell.title = event;
+                    cell.textContent = preview;
+
+                    if (eventIndex === 0 && monthIndex >= 4 && monthIndex < 10) {
+                        console.log(`月${m.key}(index=${monthIndex}): "${preview}"`);
+                    }
+                }
+
+                memoRow.appendChild(cell);
+            });
+
+            console.log(`Topix行${eventIndex}: セル数=${memoRow.children.length - 1}`);
+            tbody.appendChild(memoRow);
+        }
     }
 
     // HTMLエスケープ
@@ -1008,6 +1456,176 @@ class UI {
         return colors[category] || '#f5f5f5';
     }
 
+    // カテゴリごとの背景色をアルファ値付きで取得
+    getCategoryColorWithAlpha(category, alpha) {
+        const colorMap = {
+            '食品': '76, 175, 80',       // green
+            '日用品': '33, 150, 243',     // blue
+            '外食費': '255, 152, 0',      // orange
+            '衣類': '156, 39, 176',       // purple
+            '家具・家電': '0, 150, 136',  // teal
+            '美容': '233, 30, 99',        // pink
+            '医療費': '244, 67, 54',      // red
+            '交際費': '255, 193, 7',      // amber
+            'レジャー': '3, 169, 244',    // light blue
+            'ガソリン・ETC': '121, 85, 72', // brown
+            '光熱費': '255, 87, 34',      // deep orange
+            '通信費': '103, 58, 183',     // deep purple
+            '保険': '0, 188, 212',        // cyan
+            '車関連【車検・税金・積立】': '139, 195, 74', // light green
+            '税金': '233, 30, 99',        // pink
+            '経費': '0, 150, 136',        // teal
+            'ローン': '103, 58, 183',     // deep purple
+            'その他': '158, 158, 158'     // grey
+        };
+
+        const rgb = colorMap[category] || '158, 158, 158';
+        return `rgba(${rgb}, ${alpha})`;
+    }
+
+    // 推移表を特定の月でソート
+    sortTimelineByMonth(categories, data, months, monthIndex) {
+        const month = months[monthIndex];
+
+        // 指定された月の金額でカテゴリをソート（降順）
+        const sortedCategories = [...categories].sort((a, b) => {
+            const amountA = data[a][month.key] || 0;
+            const amountB = data[b][month.key] || 0;
+            return amountB - amountA; // 降順
+        });
+
+        // テーブルボディを再生成
+        const tbody = document.getElementById('timelineTableBody');
+        tbody.innerHTML = '';
+
+        // 選択された月の合計を計算
+        let selectedMonthTotal = 0;
+
+        sortedCategories.forEach(category => {
+            const row = document.createElement('tr');
+
+            // その行の最大値を見つける
+            const amounts = months.map(m => data[category][m.key]);
+            const maxAmount = Math.max(...amounts);
+
+            const cells = months.map((m, idx) => {
+                const amount = data[category][m.key];
+                const displayAmount = amount > 0 ? `¥${amount.toLocaleString()}` : '';
+
+                // 選択された月の場合、合計に加算
+                if (idx === monthIndex) {
+                    selectedMonthTotal += amount;
+                }
+
+                if (amount > 0 && maxAmount > 0) {
+                    const ratio = amount / maxAmount;
+                    const alpha = 0.3 + (ratio * 0.7);
+                    const bgColor = this.getCategoryColorWithAlpha(category, alpha);
+
+                    // 選択された列を強調表示
+                    const highlight = idx === monthIndex ? 'border: 2px solid #1a73e8;' : '';
+                    return `<td style="background:${bgColor}; ${highlight}">${displayAmount}</td>`;
+                } else {
+                    const highlight = idx === monthIndex ? 'border: 2px solid #1a73e8;' : '';
+                    return `<td style="${highlight}">${displayAmount}</td>`;
+                }
+            });
+
+            row.innerHTML = `
+                <td class="sticky-col"><span class="badge" data-category="${category}">${category}</span></td>
+                ${cells.join('')}
+            `;
+            tbody.appendChild(row);
+        });
+
+        // 合計行
+        const totalRow = document.createElement('tr');
+        totalRow.style.fontWeight = '500';
+        totalRow.style.borderTop = '2px solid #202124';
+        const totalCells = months.map((m, idx) => {
+            const total = categories.reduce((sum, cat) => sum + data[cat][m.key], 0);
+            const highlight = idx === monthIndex ? 'border: 2px solid #1a73e8; background: #e8f0fe;' : '';
+            return `<td style="${highlight}">¥${total.toLocaleString()}</td>`;
+        });
+        totalRow.innerHTML = `
+            <td class="sticky-col">合計</td>
+            ${totalCells.join('')}
+        `;
+        tbody.appendChild(totalRow);
+
+        // 選択された月の合計を表示するメッセージ
+        const infoRow = document.createElement('tr');
+        infoRow.style.background = '#e8f0fe';
+        infoRow.style.fontWeight = '500';
+        infoRow.innerHTML = `
+            <td class="sticky-col" colspan="${months.length + 1}" style="text-align: center; padding: 12px;">
+                ${month.year}年${month.month}月でソート済み - 合計: ¥${selectedMonthTotal.toLocaleString()}
+            </td>
+        `;
+        tbody.appendChild(infoRow);
+
+        // 出来事行を再追加（複数行対応）
+        // 各月の出来事を配列として取得
+        const monthsEvents = months.map(m => {
+            const memo = this.manager.getMemo(m.key);
+            console.log(`Topix取得(ソート後): ${m.key}`, memo);
+            const events = memo.events ? memo.events.trim() : '';
+            return events ? events.split('\n').filter(e => e.trim()).slice(0, 10) : [];
+        });
+
+        // 常に10行のTopix行を作成
+        const topixRowCount = 10;
+
+        for (let eventIndex = 0; eventIndex < topixRowCount; eventIndex++) {
+            const memoRow = document.createElement('tr');
+            memoRow.className = 'timeline-memo-row';
+            memoRow.style.display = 'table-row';
+
+            // 左端のTopixラベルセルを追加
+            const labelCell = document.createElement('td');
+            labelCell.className = 'memo-label';
+            labelCell.textContent = 'Topix';
+            // 直接スタイルを適用
+            labelCell.style.minWidth = '100px';
+            labelCell.style.maxWidth = '100px';
+            labelCell.style.width = '100px';
+            labelCell.style.position = 'sticky';
+            labelCell.style.left = '0';
+            labelCell.style.backgroundColor = '#fff8e1';
+            labelCell.style.zIndex = '10';
+            labelCell.style.fontWeight = '500';
+            labelCell.style.color = '#202124';
+            labelCell.style.display = 'table-cell';
+            labelCell.style.boxSizing = 'border-box';
+            labelCell.style.padding = '8px';
+            memoRow.appendChild(labelCell);
+
+            // 各月のセルを追加
+            months.forEach((m, idx) => {
+                const events = monthsEvents[idx];
+                const event = events ? events[eventIndex] : null;
+
+                const cell = document.createElement('td');
+                cell.className = 'memo-cell';
+
+                // 選択された列を強調表示
+                if (idx === monthIndex) {
+                    cell.style.border = '2px solid #1a73e8';
+                }
+
+                if (event && event.trim()) {
+                    const preview = event.length > 15 ? event.substring(0, 15) + '...' : event;
+                    cell.title = event;
+                    cell.textContent = preview;
+                }
+
+                memoRow.appendChild(cell);
+            });
+
+            tbody.appendChild(memoRow);
+        }
+    }
+
     // メモを読み込み
     loadMemo() {
         const yearMonth = document.getElementById('memoYearMonth').value;
@@ -1036,6 +1654,27 @@ class UI {
 
         this.manager.saveMemo(yearMonth, events, plans);
         this.showMessage(`${yearMonth}のメモを保存しました`);
+    }
+
+    // 年度メモを読み込み
+    loadYearMemo(year) {
+        const memo = this.manager.getYearMemo(year.toString());
+        document.getElementById('yearMemoText').value = memo;
+        // 現在表示している年度を保存
+        this.currentYearForMemo = year;
+    }
+
+    // 年度メモを保存
+    saveYearMemo() {
+        const year = this.currentYearForMemo;
+        if (!year) {
+            alert('年度が指定されていません');
+            return;
+        }
+
+        const memo = document.getElementById('yearMemoText').value;
+        this.manager.saveYearMemo(year.toString(), memo);
+        this.showMessage(`${year}年のメモを保存しました`);
     }
 
     // 分析期間タイプ変更時の表示切り替え
@@ -1138,25 +1777,32 @@ class UI {
             expenses = expenses.filter(e => e.subcategory === selectedSubcategory);
         }
 
+        // 分析データを保存（エクスポート用）
+        this.analysisData = {
+            expenses: expenses,
+            dateRangeType: dateRangeType,
+            year: year,
+            month: month,
+            startDate: startDate,
+            endDate: endDate,
+            category: selectedCategory,
+            subcategory: selectedSubcategory
+        };
+
         // タイトル更新
         if (selectedSubcategory) {
             document.getElementById('categoryStatsTitle').textContent =
                 `${selectedCategory} - ${selectedSubcategory}`;
             document.getElementById('monthlyChartTitle').textContent =
                 `${selectedCategory} - ${selectedSubcategory} - 月別推移`;
-            document.getElementById('categoryChartTitle').textContent =
-                `${selectedCategory} - ${selectedSubcategory}`;
         } else if (selectedCategory) {
             document.getElementById('categoryStatsTitle').textContent =
                 `${selectedCategory} - 小項目別集計`;
             document.getElementById('monthlyChartTitle').textContent =
                 `${selectedCategory} - 月別推移`;
-            document.getElementById('categoryChartTitle').textContent =
-                `${selectedCategory} - 小項目別内訳`;
         } else {
             document.getElementById('categoryStatsTitle').textContent = 'カテゴリ別集計';
             document.getElementById('monthlyChartTitle').textContent = '月別推移';
-            document.getElementById('categoryChartTitle').textContent = 'カテゴリ別内訳';
         }
 
         // カテゴリ別集計または小項目別集計
@@ -1171,6 +1817,25 @@ class UI {
 
         // グラフ更新
         this.updateChartsWithPeriod(expenses, dateRangeType, year, selectedCategory, selectedSubcategory);
+
+        // 年別表の表示・非表示
+        if (dateRangeType === 'year' && year && !selectedCategory) {
+            // 年指定かつカテゴリ未選択の場合のみ年別表を表示
+            document.getElementById('yearlyTableCard').style.display = 'block';
+            this.renderYearlyTable(year);
+        } else {
+            document.getElementById('yearlyTableCard').style.display = 'none';
+        }
+
+        // 年度メモの表示・非表示
+        if (dateRangeType === 'year' && year) {
+            // 年指定の場合は年度メモを表示
+            document.getElementById('yearMemoCard').style.display = 'block';
+            document.getElementById('yearMemoTitle').textContent = `${year}年 メモ`;
+            this.loadYearMemo(year);
+        } else {
+            document.getElementById('yearMemoCard').style.display = 'none';
+        }
     }
 
     // 簡易統計表示（小項目選択時）
@@ -1200,43 +1865,118 @@ class UI {
 
     // グラフ更新（期間対応版）
     updateChartsWithPeriod(expenses, dateRangeType, year, selectedCategory = null, selectedSubcategory = null) {
+        // 年指定の場合は従来通り12ヶ月、それ以外は年月別
+        const useYearMonth = dateRangeType !== 'year';
+
         if (selectedSubcategory) {
-            // 小項目選択時：月別推移のみ表示
-            const monthlyData = this.getMonthlyDataFromExpenses(expenses);
-            this.renderMonthlyChart(monthlyData);
-
-            // 円グラフは非表示にするためダミーデータ
-            this.renderCategoryChart({});
+            // 小項目選択時：月別推移と月別データ一覧、取引明細
+            const monthlyData = this.getMonthlyDataFromExpenses(expenses, useYearMonth);
+            this.renderMonthlyChart(monthlyData, false, useYearMonth);
+            this.renderMonthlyDataTable(expenses);
+            this.renderSubcategoryDetails(expenses, selectedSubcategory);
         } else if (selectedCategory) {
-            // カテゴリ選択時：月別推移と小項目別内訳
-            const monthlyData = this.getMonthlyDataFromExpenses(expenses);
-            this.renderMonthlyChart(monthlyData);
-
-            const subcategoryTotals = {};
-            expenses.forEach(e => {
-                const subcat = e.subcategory || '(未分類)';
-                subcategoryTotals[subcat] = (subcategoryTotals[subcat] || 0) + parseInt(e.amount);
-            });
-            this.renderCategoryChart(subcategoryTotals);
+            // カテゴリ選択時：月別推移と月別データ一覧
+            const monthlyData = this.getMonthlyDataFromExpenses(expenses, useYearMonth);
+            this.renderMonthlyChart(monthlyData, false, useYearMonth);
+            this.renderMonthlyDataTable(expenses);
+            // 取引明細を非表示
+            document.getElementById('subcategoryDetailsCard').style.display = 'none';
         } else {
-            // 全カテゴリ：月別推移とカテゴリ別内訳
-            const monthlyData = this.getMonthlyDataFromExpenses(expenses);
-            this.renderMonthlyChart(monthlyData);
-
-            const categoryTotals = this.manager.getCategoryTotals(expenses);
-            this.renderCategoryChart(categoryTotals);
+            // 全カテゴリ：月別推移（カテゴリ別）と月別データ一覧
+            const monthlyCategoryData = this.getMonthlyCategoryDataFromExpenses(expenses, useYearMonth);
+            this.renderMonthlyChart(monthlyCategoryData, true, useYearMonth); // カテゴリ別フラグと年月フラグ
+            this.renderMonthlyDataTable(expenses);
+            // 取引明細を非表示
+            document.getElementById('subcategoryDetailsCard').style.display = 'none';
         }
     }
 
     // 支出データから月別データを生成
-    getMonthlyDataFromExpenses(expenses) {
-        const monthlyData = Array(12).fill(0);
-        expenses.forEach(e => {
-            const date = new Date(e.date);
-            const month = date.getMonth();
-            monthlyData[month] += parseInt(e.amount);
-        });
-        return monthlyData;
+    getMonthlyDataFromExpenses(expenses, useYearMonth = false) {
+        if (!useYearMonth) {
+            // 年指定時：従来通り12ヶ月
+            const monthlyData = Array(12).fill(0);
+            expenses.forEach(e => {
+                const date = new Date(e.date);
+                const month = date.getMonth();
+                monthlyData[month] += parseInt(e.amount);
+            });
+            return monthlyData;
+        } else {
+            // 全期間・月指定・カスタム期間：年月別
+            const monthlyData = {};
+            expenses.forEach(e => {
+                const yearMonth = e.date.substring(0, 7); // YYYY-MM
+                monthlyData[yearMonth] = (monthlyData[yearMonth] || 0) + parseInt(e.amount);
+            });
+
+            // ソートして配列に変換
+            const sortedKeys = Object.keys(monthlyData).sort();
+            const sortedData = {};
+            sortedKeys.forEach(key => {
+                sortedData[key] = monthlyData[key];
+            });
+
+            return sortedData;
+        }
+    }
+
+    // 支出データからカテゴリ別月別データを生成
+    getMonthlyCategoryDataFromExpenses(expenses, useYearMonth = false) {
+        const categories = ['食品', '日用品', '外食費', '衣類', '家具・家電', '美容', '医療費', '交際費', 'レジャー', 'ガソリン・ETC', '光熱費', '通信費', '保険', '車関連【車検・税金・積立】', '税金', '経費', 'ローン', 'その他'];
+
+        if (!useYearMonth) {
+            // 年指定時：従来通り12ヶ月
+            const categoryData = {};
+            categories.forEach(cat => {
+                categoryData[cat] = Array(12).fill(0);
+            });
+
+            expenses.forEach(e => {
+                const date = new Date(e.date);
+                const month = date.getMonth();
+                const category = e.category;
+                if (categoryData[category]) {
+                    categoryData[category][month] += parseInt(e.amount);
+                }
+            });
+
+            return categoryData;
+        } else {
+            // 全期間・月指定・カスタム期間：年月別
+            const categoryData = {};
+            categories.forEach(cat => {
+                categoryData[cat] = {};
+            });
+
+            // 全ての年月を収集
+            const allYearMonths = new Set();
+            expenses.forEach(e => {
+                const yearMonth = e.date.substring(0, 7); // YYYY-MM
+                allYearMonths.add(yearMonth);
+            });
+
+            // ソートされた年月リスト
+            const sortedYearMonths = Array.from(allYearMonths).sort();
+
+            // 各カテゴリの年月データを初期化
+            categories.forEach(cat => {
+                sortedYearMonths.forEach(ym => {
+                    categoryData[cat][ym] = 0;
+                });
+            });
+
+            // データを集計
+            expenses.forEach(e => {
+                const yearMonth = e.date.substring(0, 7);
+                const category = e.category;
+                if (categoryData[category]) {
+                    categoryData[category][yearMonth] = (categoryData[category][yearMonth] || 0) + parseInt(e.amount);
+                }
+            });
+
+            return categoryData;
+        }
     }
 
     // カテゴリ別統計表示
@@ -1307,35 +2047,165 @@ class UI {
 
 
     // 月別推移グラフ
-    renderMonthlyChart(data) {
+    renderMonthlyChart(data, isCategoryBased = false, useYearMonth = false) {
         const ctx = document.getElementById('monthlyChart').getContext('2d');
 
         if (this.monthlyChart) {
             this.monthlyChart.destroy();
         }
 
-        this.monthlyChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
-                datasets: [{
-                    label: '支出額',
-                    data: data,
-                    borderColor: '#667eea',
-                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
+        let datasets;
+        let options;
+        let labels;
+
+        // ラベルの生成
+        if (useYearMonth) {
+            // 年月形式のラベル（例：2020-01, 2020-02...）
+            if (isCategoryBased) {
+                // カテゴリ別の場合、最初のカテゴリからキーを取得
+                const firstCategory = Object.keys(data)[0];
+                labels = Object.keys(data[firstCategory] || {});
+            } else {
+                // 単一データの場合
+                labels = Object.keys(data);
+            }
+            // YYYY-MM形式を YY.MM 形式に変換
+            labels = labels.map(ym => {
+                const [year, month] = ym.split('-');
+                return `${year.substring(2)}.${month}`;
+            });
+        } else {
+            // 従来の12ヶ月形式
+            labels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+        }
+
+        if (isCategoryBased) {
+            // カテゴリ別の積み上げ棒グラフ
+            const categoryColors = {
+                '食品': 'rgba(76, 175, 80, 0.8)',
+                '日用品': 'rgba(33, 150, 243, 0.8)',
+                '外食費': 'rgba(255, 152, 0, 0.8)',
+                '衣類': 'rgba(156, 39, 176, 0.8)',
+                '家具・家電': 'rgba(0, 150, 136, 0.8)',
+                '美容': 'rgba(233, 30, 99, 0.8)',
+                '医療費': 'rgba(244, 67, 54, 0.8)',
+                '交際費': 'rgba(255, 193, 7, 0.8)',
+                'レジャー': 'rgba(3, 169, 244, 0.8)',
+                'ガソリン・ETC': 'rgba(121, 85, 72, 0.8)',
+                '光熱費': 'rgba(255, 87, 34, 0.8)',
+                '通信費': 'rgba(103, 58, 183, 0.8)',
+                '保険': 'rgba(0, 188, 212, 0.8)',
+                '車関連【車検・税金・積立】': 'rgba(139, 195, 74, 0.8)',
+                '税金': 'rgba(233, 30, 99, 0.8)',
+                '経費': 'rgba(0, 150, 136, 0.8)',
+                'ローン': 'rgba(103, 58, 183, 0.8)',
+                'その他': 'rgba(158, 158, 158, 0.8)'
+            };
+
+            datasets = Object.entries(data).map(([category, monthlyData]) => ({
+                label: category,
+                data: useYearMonth ? Object.values(monthlyData) : monthlyData,
+                backgroundColor: categoryColors[category] || 'rgba(158, 158, 158, 0.8)',
+                borderWidth: 0
+            }));
+
+            options = {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: 12,
+                            padding: 8,
+                            font: {
+                                size: 10
+                            }
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                // tooltipItems[0]のdataIndexを使用してラベルを取得
+                                if (tooltipItems && tooltipItems.length > 0) {
+                                    const index = tooltipItems[0].dataIndex;
+                                    return this.chart.data.labels[index];
+                                }
+                                return '';
+                            },
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                const value = context.parsed.y || 0;
+                                return label + ': ' + value.toLocaleString() + '円';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return value.toLocaleString() + '円';
+                            }
+                        }
+                    }
+                }
+            };
+        } else {
+            // 単一データの棒グラフ
+            datasets = [{
+                label: '支出額',
+                data: useYearMonth ? Object.values(data) : data,
+                backgroundColor: '#667eea',
+                borderColor: '#667eea',
+                borderWidth: 1
+            }];
+
+            options = {
                 responsive: true,
                 maintainAspectRatio: true,
                 plugins: {
                     legend: {
                         display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            title: function(tooltipItems) {
+                                // tooltipItems[0]のdataIndexを使用してラベルを取得
+                                if (tooltipItems && tooltipItems.length > 0) {
+                                    const index = tooltipItems[0].dataIndex;
+                                    return this.chart.data.labels[index];
+                                }
+                                return '';
+                            },
+                            label: function(context) {
+                                const value = context.parsed.y || 0;
+                                return '支出額: ' + value.toLocaleString() + '円';
+                            }
+                        }
                     }
                 },
                 scales: {
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    },
                     y: {
                         beginAtZero: true,
                         ticks: {
@@ -1345,68 +2215,438 @@ class UI {
                         }
                     }
                 }
-            }
+            };
+        }
+
+        this.monthlyChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: options
         });
     }
 
-    // カテゴリ別円グラフ
-    renderCategoryChart(data) {
-        const ctx = document.getElementById('categoryChart').getContext('2d');
+    // 月別データ一覧テーブル
+    renderMonthlyDataTable(expenses) {
+        const container = document.getElementById('monthlyDataTable');
 
-        if (this.categoryChart) {
-            this.categoryChart.destroy();
-        }
+        // 月ごとにデータを集計
+        const monthlyDetails = Array(12).fill(null).map(() => ({
+            count: 0,
+            total: 0
+        }));
 
-        const labels = Object.keys(data);
-        const values = Object.values(data);
-        const colors = [
-            '#667eea', '#764ba2', '#f093fb', '#4facfe',
-            '#43e97b', '#fa709a', '#fee140', '#30cfd0'
-        ];
+        expenses.forEach(e => {
+            const date = new Date(e.date);
+            const month = date.getMonth();
+            monthlyDetails[month].count++;
+            monthlyDetails[month].total += parseInt(e.amount);
+        });
 
-        this.categoryChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: colors.slice(0, labels.length)
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.parsed || 0;
-                                return label + ': ' + value.toLocaleString() + '円';
-                            }
-                        }
-                    }
-                }
+        // テーブルHTML生成
+        let html = `
+            <table class="monthly-data-table">
+                <thead>
+                    <tr>
+                        <th>月</th>
+                        <th>件数</th>
+                        <th>合計金額</th>
+                        <th>平均</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        monthlyDetails.forEach((detail, index) => {
+            const monthName = `${index + 1}月`;
+            const count = detail.count;
+            const total = detail.total;
+            const average = count > 0 ? Math.round(total / count) : 0;
+
+            if (count > 0) {
+                html += `
+                    <tr>
+                        <td>${monthName}</td>
+                        <td>${count}件</td>
+                        <td>${total.toLocaleString()}円</td>
+                        <td>${average.toLocaleString()}円</td>
+                    </tr>
+                `;
             }
         });
+
+        html += `
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = html;
+    }
+
+    // 小項目別取引明細テーブル
+    renderSubcategoryDetails(expenses, subcategory) {
+        const container = document.getElementById('subcategoryDetailsTable');
+        const card = document.getElementById('subcategoryDetailsCard');
+        const title = document.getElementById('subcategoryDetailsTitle');
+
+        if (!expenses || expenses.length === 0) {
+            card.style.display = 'none';
+            return;
+        }
+
+        // カードを表示
+        card.style.display = 'block';
+        title.textContent = `${subcategory} - 取引明細（全${expenses.length}件）`;
+
+        // 日付でソート（新しい順）
+        const sortedExpenses = [...expenses].sort((a, b) => {
+            return new Date(b.date) - new Date(a.date);
+        });
+
+        // テーブルHTML生成
+        let html = `
+            <table class="subcategory-details-table">
+                <thead>
+                    <tr>
+                        <th>日付</th>
+                        <th>カテゴリ</th>
+                        <th>小項目</th>
+                        <th>金額</th>
+                        <th>場所</th>
+                        <th>商品名・メモ</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        sortedExpenses.forEach(expense => {
+            html += `
+                <tr>
+                    <td>${expense.date}</td>
+                    <td><span class="badge" data-category="${expense.category}">${expense.category}</span></td>
+                    <td>${expense.subcategory || '-'}</td>
+                    <td style="text-align: right; font-weight: 500;">¥${parseInt(expense.amount).toLocaleString()}</td>
+                    <td>${expense.place || '-'}</td>
+                    <td>${expense.description || '-'}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = html;
+
+        // バッジの色を適用
+        setTimeout(() => {
+            const badges = container.querySelectorAll('.badge');
+            badges.forEach(badge => {
+                const category = badge.getAttribute('data-category');
+                const color = this.getCategoryColor(category);
+                badge.style.backgroundColor = color;
+            });
+        }, 0);
+    }
+
+    // 年別カテゴリ推移表
+    renderYearlyTable(year) {
+        // 月のリストを生成（1月〜12月）
+        const months = [];
+        for (let month = 1; month <= 12; month++) {
+            months.push({
+                year,
+                month,
+                key: `${year}-${String(month).padStart(2, '0')}`,
+                label: `${String(year).substring(2)}.${String(month).padStart(2, '0')}`
+            });
+        }
+
+        // カテゴリリスト
+        const categories = ['食品', '日用品', '外食費', '衣類', '家具・家電', '美容', '医療費', '交際費', 'レジャー', 'ガソリン・ETC', '光熱費', '通信費', '保険', '車関連【車検・税金・積立】', '税金', '経費', 'ローン', 'その他'];
+
+        // カテゴリごと・月ごとの集計
+        const data = {};
+        categories.forEach(cat => {
+            data[cat] = {};
+            months.forEach(m => {
+                data[cat][m.key] = 0;
+            });
+        });
+
+        // データを集計
+        this.manager.getAllExpenses().forEach(expense => {
+            const date = expense.date;
+            const yearMonth = date.substring(0, 7); // YYYY-MM
+            if (data[expense.category] && data[expense.category][yearMonth] !== undefined) {
+                data[expense.category][yearMonth] += parseInt(expense.amount || 0);
+            }
+        });
+
+        // テーブルヘッダーを生成（ソート可能）
+        const thead = document.getElementById('yearlyTableHead');
+        thead.innerHTML = `
+            <tr>
+                <th class="sticky-col sortable-header" data-reset="true" title="クリックで元の順序に戻す" style="cursor: pointer;">カテゴリ</th>
+                ${months.map((m, idx) => `<th class="sortable-header" data-month-index="${idx}" title="クリックでソート">${m.label}</th>`).join('')}
+            </tr>
+        `;
+
+        // カテゴリヘッダーにリセットイベントを追加
+        const categoryHeader = thead.querySelector('th[data-reset="true"]');
+        categoryHeader.addEventListener('click', () => {
+            this.renderYearlyTable(year); // 元の順序で再描画
+        });
+
+        // 月ヘッダーにソートイベントを追加
+        thead.querySelectorAll('.sortable-header[data-month-index]').forEach(th => {
+            th.addEventListener('click', () => {
+                const monthIndex = parseInt(th.getAttribute('data-month-index'));
+                this.sortYearlyTableByMonth(categories, data, months, monthIndex, year);
+            });
+        });
+
+        // テーブルボディを生成
+        const tbody = document.getElementById('yearlyTableBody');
+        tbody.innerHTML = '';
+
+        categories.forEach(category => {
+            const row = document.createElement('tr');
+
+            // その行の最大値を見つける
+            const amounts = months.map(m => data[category][m.key]);
+            const maxAmount = Math.max(...amounts);
+
+            const cells = months.map(m => {
+                const amount = data[category][m.key];
+                const displayAmount = amount > 0 ? `¥${amount.toLocaleString()}` : '';
+
+                if (amount > 0 && maxAmount > 0) {
+                    // 金額の比率を計算（最大値に対する割合）
+                    const ratio = amount / maxAmount;
+                    // 比率に応じて色の濃さを調整（0.3〜1.0）
+                    const alpha = 0.3 + (ratio * 0.7);
+                    const bgColor = this.getCategoryColorWithAlpha(category, alpha);
+                    return `<td style="background:${bgColor}">${displayAmount}</td>`;
+                } else {
+                    return `<td>${displayAmount}</td>`;
+                }
+            });
+
+            row.innerHTML = `
+                <td class="sticky-col"><span class="badge" data-category="${category}">${category}</span></td>
+                ${cells.join('')}
+            `;
+            tbody.appendChild(row);
+        });
+
+        // 合計行
+        const totalRow = document.createElement('tr');
+        totalRow.style.fontWeight = '500';
+        totalRow.style.borderTop = '2px solid #202124';
+        const totalCells = months.map(m => {
+            const total = categories.reduce((sum, cat) => sum + data[cat][m.key], 0);
+            return `<td>¥${total.toLocaleString()}</td>`;
+        });
+        totalRow.innerHTML = `
+            <td class="sticky-col">合計</td>
+            ${totalCells.join('')}
+        `;
+        tbody.appendChild(totalRow);
+
+        // Topix行（出来事）
+        const topixRow = document.createElement('tr');
+        topixRow.style.backgroundColor = '#fff9e6';
+        topixRow.style.borderTop = '3px solid #ffc107';
+        topixRow.style.height = '60px';
+        const topixCells = months.map(m => {
+            const memo = this.manager.getMemo(m.key);
+            const events = memo.events ? memo.events.split('\n').filter(e => e.trim()).join('、') : '';
+            return `<td style="font-size: 11px; padding: 8px; white-space: normal; overflow: hidden; line-height: 1.4; vertical-align: top;">${events}</td>`;
+        });
+        topixRow.innerHTML = `
+            <td class="sticky-col" style="background: #fff9e6; vertical-align: top;"><strong>Topix</strong></td>
+            ${topixCells.join('')}
+        `;
+        tbody.appendChild(topixRow);
+
+        // 予定行
+        const plansRow = document.createElement('tr');
+        plansRow.style.backgroundColor = '#e6f4ff';
+        plansRow.style.height = '60px';
+        const plansCells = months.map(m => {
+            const memo = this.manager.getMemo(m.key);
+            const plans = memo.plans ? memo.plans.split('\n').filter(p => p.trim()).join('、') : '';
+            return `<td style="font-size: 11px; padding: 8px; white-space: normal; overflow: hidden; line-height: 1.4; vertical-align: top;">${plans}</td>`;
+        });
+        plansRow.innerHTML = `
+            <td class="sticky-col" style="background: #e6f4ff; vertical-align: top;"><strong>予定</strong></td>
+            ${plansCells.join('')}
+        `;
+        tbody.appendChild(plansRow);
+
+        // タイトル更新
+        document.getElementById('yearlyTableTitle').textContent = `${year}年 カテゴリ別推移`;
+    }
+
+    // 年別表を特定の月でソート
+    sortYearlyTableByMonth(categories, data, months, monthIndex, year) {
+        const month = months[monthIndex];
+
+        // 指定された月の金額でカテゴリをソート（降順）
+        const sortedCategories = [...categories].sort((a, b) => {
+            const amountA = data[a][month.key] || 0;
+            const amountB = data[b][month.key] || 0;
+            return amountB - amountA; // 降順
+        });
+
+        // テーブルボディを再生成
+        const tbody = document.getElementById('yearlyTableBody');
+        tbody.innerHTML = '';
+
+        // 選択された月の合計を計算
+        let selectedMonthTotal = 0;
+
+        sortedCategories.forEach(category => {
+            const row = document.createElement('tr');
+
+            // その行の最大値を見つける
+            const amounts = months.map(m => data[category][m.key]);
+            const maxAmount = Math.max(...amounts);
+
+            const cells = months.map((m, idx) => {
+                const amount = data[category][m.key];
+                const displayAmount = amount > 0 ? `¥${amount.toLocaleString()}` : '';
+
+                // 選択された月の場合、合計に加算
+                if (idx === monthIndex) {
+                    selectedMonthTotal += amount;
+                }
+
+                if (amount > 0 && maxAmount > 0) {
+                    const ratio = amount / maxAmount;
+                    const alpha = 0.3 + (ratio * 0.7);
+                    const bgColor = this.getCategoryColorWithAlpha(category, alpha);
+
+                    // 選択された列を強調表示
+                    const highlight = idx === monthIndex ? 'border: 2px solid #1a73e8;' : '';
+                    return `<td style="background:${bgColor}; ${highlight}">${displayAmount}</td>`;
+                } else {
+                    const highlight = idx === monthIndex ? 'border: 2px solid #1a73e8;' : '';
+                    return `<td style="${highlight}">${displayAmount}</td>`;
+                }
+            });
+
+            row.innerHTML = `
+                <td class="sticky-col"><span class="badge" data-category="${category}">${category}</span></td>
+                ${cells.join('')}
+            `;
+            tbody.appendChild(row);
+        });
+
+        // 合計行
+        const totalRow = document.createElement('tr');
+        totalRow.style.fontWeight = '500';
+        totalRow.style.borderTop = '2px solid #202124';
+        const totalCells = months.map((m, idx) => {
+            const total = categories.reduce((sum, cat) => sum + data[cat][m.key], 0);
+            const highlight = idx === monthIndex ? 'border: 2px solid #1a73e8; background: #e8f0fe;' : '';
+            return `<td style="${highlight}">¥${total.toLocaleString()}</td>`;
+        });
+        totalRow.innerHTML = `
+            <td class="sticky-col">合計</td>
+            ${totalCells.join('')}
+        `;
+        tbody.appendChild(totalRow);
+
+        // 選択された月の合計を表示するメッセージ
+        const infoRow = document.createElement('tr');
+        infoRow.style.background = '#e8f0fe';
+        infoRow.style.fontWeight = '500';
+        infoRow.innerHTML = `
+            <td class="sticky-col" colspan="${months.length + 1}" style="text-align: center; padding: 12px;">
+                ${month.year}年${month.month}月でソート済み - 合計: ¥${selectedMonthTotal.toLocaleString()}
+            </td>
+        `;
+        tbody.appendChild(infoRow);
+
+        // Topix行（出来事）
+        const topixRow = document.createElement('tr');
+        topixRow.style.backgroundColor = '#fff9e6';
+        topixRow.style.borderTop = '3px solid #ffc107';
+        topixRow.style.height = '60px';
+        const topixCells = months.map((m, idx) => {
+            const memo = this.manager.getMemo(m.key);
+            const events = memo.events ? memo.events.split('\n').filter(e => e.trim()).join('、') : '';
+            const highlight = idx === monthIndex ? 'border: 2px solid #1a73e8;' : '';
+            return `<td style="font-size: 11px; padding: 8px; white-space: normal; overflow: hidden; line-height: 1.4; vertical-align: top; ${highlight}">${events}</td>`;
+        });
+        topixRow.innerHTML = `
+            <td class="sticky-col" style="background: #fff9e6; vertical-align: top;"><strong>Topix</strong></td>
+            ${topixCells.join('')}
+        `;
+        tbody.appendChild(topixRow);
+
+        // 予定行
+        const plansRow = document.createElement('tr');
+        plansRow.style.backgroundColor = '#e6f4ff';
+        plansRow.style.height = '60px';
+        const plansCells = months.map((m, idx) => {
+            const memo = this.manager.getMemo(m.key);
+            const plans = memo.plans ? memo.plans.split('\n').filter(p => p.trim()).join('、') : '';
+            const highlight = idx === monthIndex ? 'border: 2px solid #1a73e8;' : '';
+            return `<td style="font-size: 11px; padding: 8px; white-space: normal; overflow: hidden; line-height: 1.4; vertical-align: top; ${highlight}">${plans}</td>`;
+        });
+        plansRow.innerHTML = `
+            <td class="sticky-col" style="background: #e6f4ff; vertical-align: top;"><strong>予定</strong></td>
+            ${plansCells.join('')}
+        `;
+        tbody.appendChild(plansRow);
+
+        // タイトル更新
+        document.getElementById('yearlyTableTitle').textContent = `${year}年 カテゴリ別推移（${month.month}月でソート済み）`;
     }
 
     // データエクスポート
     exportData() {
-        const data = this.manager.getAllExpenses();
-        const csv = this.convertToCSV(data);
+        // 現在のアクティブタブを取得
+        const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
+
+        let data, filename, csv;
+
+        if (activeTab === 'list') {
+            // 一覧タブ：フィルター適用後のデータをエクスポート
+            data = this.filteredExpenses;
+            filename = `家計簿_一覧_${new Date().toISOString().split('T')[0]}.csv`;
+            csv = this.convertToCSV(data);
+            this.showMessage(`フィルター適用後のデータ（${data.length}件）をエクスポートしました`);
+        } else if (activeTab === 'analysis') {
+            // 分析タブ：分析結果をエクスポート
+            if (!this.analysisData || !this.analysisData.expenses) {
+                this.showMessage('分析データがありません');
+                return;
+            }
+            csv = this.convertAnalysisToCSV(this.analysisData);
+            filename = `家計簿_分析_${new Date().toISOString().split('T')[0]}.csv`;
+            this.showMessage(`分析結果（${this.analysisData.expenses.length}件）をエクスポートしました`);
+        } else {
+            // その他のタブ：全データをエクスポート
+            data = this.manager.getAllExpenses();
+            filename = `家計簿_全データ_${new Date().toISOString().split('T')[0]}.csv`;
+            csv = this.convertToCSV(data);
+            this.showMessage(`全データ（${data.length}件）をエクスポートしました`);
+        }
+
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
 
         link.setAttribute('href', url);
-        link.setAttribute('download', `家計簿_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute('download', filename);
         link.click();
-
-        this.showMessage('データをエクスポートしました');
     }
 
     // CSVに変換
@@ -1422,6 +2662,104 @@ class UI {
         ]);
 
         const csv = [headers, ...rows]
+            .map(row => row.map(cell => `"${cell}"`).join(','))
+            .join('\n');
+
+        return '\uFEFF' + csv; // BOM追加でExcelで文字化け防止
+    }
+
+    // 分析データをCSVに変換
+    convertAnalysisToCSV(analysisData) {
+        const { expenses, dateRangeType, year, month, startDate, endDate, category, subcategory } = analysisData;
+
+        // ヘッダー情報
+        let headerInfo = [];
+        headerInfo.push(['=== 分析条件 ===']);
+
+        // 期間情報
+        if (dateRangeType === 'year' && year) {
+            headerInfo.push(['期間', `${year}年`]);
+        } else if (dateRangeType === 'month' && year && month) {
+            headerInfo.push(['期間', `${year}年${month}月`]);
+        } else if (dateRangeType === 'custom' && startDate && endDate) {
+            headerInfo.push(['期間', `${startDate} 〜 ${endDate}`]);
+        }
+
+        // カテゴリ・小項目情報
+        if (category) {
+            headerInfo.push(['カテゴリ', category]);
+        }
+        if (subcategory) {
+            headerInfo.push(['小項目', subcategory]);
+        }
+
+        // 集計情報
+        const total = expenses.reduce((sum, e) => sum + parseInt(e.amount || 0), 0);
+        const count = expenses.length;
+        const average = count > 0 ? Math.round(total / count) : 0;
+
+        headerInfo.push(['', '']);
+        headerInfo.push(['=== 集計結果 ===']);
+        headerInfo.push(['件数', `${count}件`]);
+        headerInfo.push(['合計金額', `${total.toLocaleString()}円`]);
+        headerInfo.push(['平均金額', `${average.toLocaleString()}円`]);
+
+        // カテゴリ別集計（カテゴリが選択されていない場合）
+        if (!category) {
+            headerInfo.push(['', '']);
+            headerInfo.push(['=== カテゴリ別集計 ===']);
+            headerInfo.push(['カテゴリ', '金額', '割合']);
+
+            const categoryTotals = {};
+            expenses.forEach(e => {
+                categoryTotals[e.category] = (categoryTotals[e.category] || 0) + parseInt(e.amount || 0);
+            });
+
+            Object.entries(categoryTotals)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([cat, amount]) => {
+                    const percentage = ((amount / total) * 100).toFixed(1);
+                    headerInfo.push([cat, `${amount.toLocaleString()}円`, `${percentage}%`]);
+                });
+        }
+
+        // 小項目別集計（カテゴリが選択されているが小項目が選択されていない場合）
+        if (category && !subcategory) {
+            headerInfo.push(['', '']);
+            headerInfo.push(['=== 小項目別集計 ===']);
+            headerInfo.push(['小項目', '金額', '割合']);
+
+            const subcategoryTotals = {};
+            expenses.forEach(e => {
+                const sub = e.subcategory || '(未分類)';
+                subcategoryTotals[sub] = (subcategoryTotals[sub] || 0) + parseInt(e.amount || 0);
+            });
+
+            Object.entries(subcategoryTotals)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([sub, amount]) => {
+                    const percentage = ((amount / total) * 100).toFixed(1);
+                    headerInfo.push([sub, `${amount.toLocaleString()}円`, `${percentage}%`]);
+                });
+        }
+
+        // 明細データ
+        headerInfo.push(['', '']);
+        headerInfo.push(['=== 明細データ ===']);
+        const detailHeaders = ['日付', 'カテゴリ', '小項目', '金額', '場所', '商品名・メモ'];
+        headerInfo.push(detailHeaders);
+
+        const detailRows = expenses.map(e => [
+            e.date,
+            e.category,
+            e.subcategory || '',
+            e.amount,
+            e.place || '',
+            e.description || ''
+        ]);
+
+        const allRows = [...headerInfo, ...detailRows];
+        const csv = allRows
             .map(row => row.map(cell => `"${cell}"`).join(','))
             .join('\n');
 
@@ -1705,9 +3043,10 @@ class UI {
 
             // 一括入力モードに切り替えたら、初期行を追加
             if (this.bulkInputRows.length === 0) {
+                // 少し遅延を入れてrowIdが重複しないようにする
                 this.addBulkInputRow();
-                this.addBulkInputRow();
-                this.addBulkInputRow();
+                setTimeout(() => this.addBulkInputRow(), 10);
+                setTimeout(() => this.addBulkInputRow(), 20);
             }
         }
     }
@@ -1729,6 +3068,10 @@ class UI {
         row.dataset.rowId = rowId;
         row.innerHTML = `
             <td><input type="date" class="bulk-date" value="${today}"></td>
+            <td><input type="text" class="bulk-place" placeholder="場所"></td>
+            <td><input type="number" class="bulk-amount" min="0" placeholder="金額"></td>
+            <td><button class="tax-btn" onclick="ui.applyTax(${rowId})">税込</button></td>
+            <td><input type="text" class="bulk-description" placeholder="商品名"></td>
             <td>
                 <select class="bulk-category" onchange="ui.updateSubcategoryOptions(${rowId})">
                     <option value="">選択</option>
@@ -1757,10 +3100,7 @@ class UI {
                     <option value="">選択</option>
                 </select>
             </td>
-            <td><input type="number" class="bulk-amount" min="0" placeholder="金額"></td>
-            <td><button class="tax-btn" onclick="ui.applyTax(${rowId})">税込</button></td>
-            <td><input type="text" class="bulk-place" placeholder="場所"></td>
-            <td><input type="text" class="bulk-description" placeholder="商品名・メモ"></td>
+            <td><input type="text" class="bulk-notes" placeholder="メモ"></td>
             <td><button class="delete-row-btn" onclick="ui.deleteBulkInputRow(${rowId})">削除</button></td>
         `;
 
@@ -1772,10 +3112,12 @@ class UI {
             this.updateSubcategoryOptions(rowId);
         }
 
-        // 1行目のカテゴリ変更時に、2行目以降も更新
+        // 1行目の場合、カテゴリ変更時に2行目以降も更新するイベントリスナーを追加
+        // this.bulkInputRows.lengthはpush後なので、=== 1の時は1行目
         if (this.bulkInputRows.length === 1) {
             const categorySelect = row.querySelector('.bulk-category');
             categorySelect.addEventListener('change', () => {
+                // 1行目のrowIdを使用
                 this.propagateCategoryToOtherRows(rowId);
             });
         }
@@ -1868,8 +3210,8 @@ class UI {
                 // カテゴリを設定
                 categorySelect.value = selectedCategory;
 
-                // 小項目の選択肢を更新
-                this.updateSubcategoryOptions(parseInt(rowId));
+                // 小項目の選択肢を更新（rowIdは文字列なのでそのまま使用）
+                this.updateSubcategoryOptions(rowId);
             }
         });
     }
@@ -1964,6 +3306,11 @@ class UI {
         const rows = tbody.querySelectorAll('tr');
         let savedCount = 0;
         const errors = [];
+        const validExpenses = [];
+
+        // 毎月繰り返すチェックの確認
+        const repeatCheckbox = document.getElementById('bulkRepeatMonthly');
+        const repeatMonths = parseInt(document.getElementById('bulkRepeatMonths').value) || 1;
 
         rows.forEach((row, index) => {
             const date = row.querySelector('.bulk-date').value;
@@ -1972,21 +3319,45 @@ class UI {
             const amount = row.querySelector('.bulk-amount').value;
             const place = row.querySelector('.bulk-place').value;
             const description = row.querySelector('.bulk-description').value;
+            const notes = row.querySelector('.bulk-notes').value;
 
             // 必須項目チェック
             if (date && category && amount && parseFloat(amount) > 0) {
-                const expense = {
-                    date, category, subcategory, amount, place, description
-                };
-                this.manager.addExpense(expense);
-                savedCount++;
-            } else if (date || category || amount || place || description) {
+                validExpenses.push({
+                    date, category, subcategory, amount, place, description, notes
+                });
+            } else if (date || category || amount || place || description || notes) {
                 // 一部だけ入力されている場合はエラー
                 errors.push(`行${index + 1}: 日付、カテゴリ、金額は必須です`);
             }
         });
 
-        if (savedCount > 0) {
+        // 繰り返し処理
+        if (validExpenses.length > 0) {
+            if (repeatCheckbox.checked && repeatMonths > 1) {
+                // 複数月分の支出を作成
+                validExpenses.forEach(expense => {
+                    const baseDate = new Date(expense.date);
+                    for (let i = 0; i < repeatMonths; i++) {
+                        const newDate = new Date(baseDate);
+                        newDate.setMonth(baseDate.getMonth() + i);
+
+                        const repeatedExpense = {
+                            ...expense,
+                            date: newDate.toISOString().split('T')[0]
+                        };
+                        this.manager.addExpense(repeatedExpense);
+                        savedCount++;
+                    }
+                });
+            } else {
+                // 通常の保存
+                validExpenses.forEach(expense => {
+                    this.manager.addExpense(expense);
+                    savedCount++;
+                });
+            }
+
             this.renderExpenseList();
             this.showMessage(`${savedCount}件の支出を記録しました`);
 
@@ -2009,11 +3380,514 @@ class UI {
 }
 
 // ========================================
+// ふるさと納税管理
+// ========================================
+
+class FurusatoManager {
+    constructor() {
+        this.storageKey = 'furusatoTaxData';
+        this.loadData();
+    }
+
+    loadData() {
+        const data = localStorage.getItem(this.storageKey);
+        this.data = data ? JSON.parse(data) : [];
+
+        let needsSave = false;
+
+        // データ移行：古いデータでapplicantが空でmunicipalityに値がある場合、入れ替える
+        this.data.forEach(entry => {
+            if (!entry.applicant && entry.municipality) {
+                entry.applicant = entry.municipality;
+                entry.municipality = '';
+                needsSave = true;
+            }
+        });
+
+        // 重複IDを修正
+        const idMap = new Map();
+        this.data.forEach((entry, index) => {
+            if (idMap.has(entry.id)) {
+                // 重複しているIDを発見
+                const newId = Date.now().toString() + '_' + index + '_' + Math.random().toString(36).substr(2, 9);
+                console.log(`重複ID検出: ${entry.id} → ${newId} (品物: ${entry.item})`);
+                entry.id = newId;
+                needsSave = true;
+            } else {
+                idMap.set(entry.id, true);
+            }
+        });
+
+        if (needsSave) {
+            console.log('データを修正して保存します');
+            this.saveData();
+        }
+    }
+
+    saveData() {
+        localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+    }
+
+    add(entry) {
+        // ユニークなIDを生成（既存のIDと重複しないようにする）
+        let id = Date.now().toString();
+        let counter = 0;
+        while (this.data.some(e => e.id === id)) {
+            counter++;
+            id = (Date.now() + counter).toString();
+        }
+
+        const newEntry = {
+            id,
+            year: entry.year,
+            amount: parseInt(entry.amount),
+            item: entry.item,
+            applicant: entry.applicant,
+            municipality: entry.municipality || '',
+            itemReceived: false,
+            documentReceived: false
+        };
+        this.data.push(newEntry);
+        this.saveData();
+        return newEntry;
+    }
+
+    update(id, entry) {
+        const index = this.data.findIndex(e => e.id === id);
+        if (index !== -1) {
+            this.data[index] = {
+                ...this.data[index],
+                year: entry.year,
+                amount: parseInt(entry.amount),
+                item: entry.item,
+                applicant: entry.applicant,
+                municipality: entry.municipality || ''
+            };
+            this.saveData();
+            return this.data[index];
+        }
+        return null;
+    }
+
+    delete(id) {
+        this.data = this.data.filter(e => e.id !== id);
+        this.saveData();
+    }
+
+    toggleItemReceived(id) {
+        const entry = this.data.find(e => e.id === id);
+        if (entry) {
+            entry.itemReceived = !entry.itemReceived;
+            this.saveData();
+        }
+    }
+
+    toggleDocumentReceived(id) {
+        const entry = this.data.find(e => e.id === id);
+        if (entry) {
+            entry.documentReceived = !entry.documentReceived;
+            this.saveData();
+        }
+    }
+
+    getByYear(year) {
+        return this.data.filter(e => e.year === year);
+    }
+
+    getAll() {
+        return this.data;
+    }
+
+    importFromExpenses(expenses) {
+        let importedCount = 0;
+        let skippedCount = 0;
+
+        expenses.forEach(expense => {
+            // 重複チェック：同じ年、金額、品物、申請先のものがあればスキップ
+            const isDuplicate = this.data.some(existing =>
+                existing.year === expense.year &&
+                parseInt(existing.amount) === parseInt(expense.amount) &&
+                existing.item === expense.item &&
+                existing.applicant === expense.applicant
+            );
+
+            if (!isDuplicate) {
+                this.add(expense);
+                importedCount++;
+            } else {
+                skippedCount++;
+            }
+        });
+
+        return { importedCount, skippedCount };
+    }
+}
+
+class FurusatoUI {
+    constructor(manager, expenseManager) {
+        this.manager = manager;
+        this.expenseManager = expenseManager;
+        this.stateManager = new StateManager();
+        this.currentYear = new Date().getFullYear().toString();
+        this.editingId = null;
+        this.init();
+    }
+
+    init() {
+        // 年度選択肢を動的に生成
+        this.populateFurusatoYearSelects();
+
+        // 年度選択
+        document.getElementById('furusatoYear').addEventListener('change', (e) => {
+            this.currentYear = e.target.value;
+            this.stateManager.updateState('furusatoYear', e.target.value);
+            this.render();
+        });
+
+        // 検索ボックス
+        document.getElementById('furusatoSearch').addEventListener('input', (e) => {
+            this.render();
+        });
+
+        // 新規追加ボタン
+        document.getElementById('addFurusatoBtn').addEventListener('click', () => {
+            this.openModal();
+        });
+
+        // インポートボタン
+        document.getElementById('importFurusatoBtn').addEventListener('click', () => {
+            this.importFromExpenses();
+        });
+
+        // モーダル関連
+        document.getElementById('furusatoModalClose').addEventListener('click', () => {
+            this.closeModal();
+        });
+
+        document.getElementById('cancelFurusatoBtn').addEventListener('click', () => {
+            this.closeModal();
+        });
+
+        document.getElementById('furusatoForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveEntry();
+        });
+
+        // 保存された年度を復元
+        const state = this.stateManager.loadState();
+        if (state && state.furusatoYear) {
+            this.currentYear = state.furusatoYear;
+        }
+
+        // 初期表示
+        document.getElementById('furusatoYear').value = this.currentYear;
+        this.render();
+    }
+
+    // ふるさと納税の年度選択肢を動的に生成
+    populateFurusatoYearSelects() {
+        const yearSelect = document.getElementById('furusatoYear');
+        const yearInputSelect = document.getElementById('furusatoYearInput');
+        const currentYear = new Date().getFullYear();
+
+        // データから最小年と最大年を取得
+        const allData = this.manager.getAll();
+        const expenses = this.expenseManager.getAllExpenses();
+
+        let minYear = 2020;
+        let maxYear = currentYear;
+
+        // ふるさと納税データから年を取得
+        if (allData.length > 0) {
+            const years = allData.map(e => parseInt(e.year));
+            minYear = Math.min(...years, minYear);
+            maxYear = Math.max(...years, maxYear);
+        }
+
+        // 支出データからも年を取得
+        if (expenses.length > 0) {
+            const expenseYears = expenses.map(e => new Date(e.date).getFullYear());
+            minYear = Math.min(...expenseYears, minYear);
+            maxYear = Math.max(...expenseYears, maxYear);
+        }
+
+        // 未来10年まで拡張
+        const futureYear = currentYear + 10;
+        maxYear = Math.max(maxYear, futureYear);
+
+        // 両方のセレクトボックスに年を追加
+        for (let year = minYear; year <= maxYear; year++) {
+            const option1 = document.createElement('option');
+            option1.value = year;
+            option1.textContent = `${year}年`;
+            yearSelect.appendChild(option1);
+
+            const option2 = document.createElement('option');
+            option2.value = year;
+            option2.textContent = `${year}年`;
+            yearInputSelect.appendChild(option2);
+        }
+    }
+
+    render() {
+        const container = document.getElementById('furusatoTableContainer');
+        let entries = this.manager.getByYear(this.currentYear);
+
+        // 検索フィルター
+        const searchText = document.getElementById('furusatoSearch').value.toLowerCase().trim();
+        if (searchText) {
+            entries = entries.filter(entry => {
+                const item = (entry.item || '').toLowerCase();
+                const applicant = (entry.applicant || '').toLowerCase();
+                const municipality = (entry.municipality || '').toLowerCase();
+                return item.includes(searchText) ||
+                       applicant.includes(searchText) ||
+                       municipality.includes(searchText);
+            });
+        }
+
+        console.log(`Rendering ${entries.length} entries for year ${this.currentYear}:`, entries);
+
+        if (entries.length === 0) {
+            const message = searchText
+                ? `検索結果が見つかりません（検索: "${searchText}"）`
+                : `${this.currentYear}年のふるさと納税データがありません`;
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #5f6368;">
+                    <p>${message}</p>
+                    ${!searchText ? '<p>「新規追加」ボタンから登録してください</p>' : ''}
+                </div>
+            `;
+            return;
+        }
+
+        // 合計計算
+        const total = entries.reduce((sum, e) => sum + e.amount, 0);
+
+        const searchInfo = searchText ? ` （検索: "${searchText}"・${entries.length}件）` : '';
+        let html = `
+            <div class="furusato-summary">
+                <strong>${this.currentYear}年 合計：¥${total.toLocaleString()}${searchInfo}</strong>
+            </div>
+            <table class="furusato-table">
+                <thead>
+                    <tr>
+                        <th style="width: 35px;">No.</th>
+                        <th style="width: 90px;">金額</th>
+                        <th style="min-width: 200px;">品物</th>
+                        <th style="min-width: 130px;">申請先</th>
+                        <th style="min-width: 130px;">自治体</th>
+                        <th style="width: 65px; text-align: center;">品物受取</th>
+                        <th style="width: 65px; text-align: center;">納税書</th>
+                        <th style="width: 70px; text-align: center;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        entries.forEach((entry, index) => {
+            const escapedId = String(entry.id).replace(/'/g, "\\'");
+            html += `
+                <tr data-entry-id="${entry.id}">
+                    <td style="text-align: center;">${index + 1}</td>
+                    <td style="text-align: right; font-weight: 500;">¥${entry.amount.toLocaleString()}</td>
+                    <td>${entry.item}</td>
+                    <td>${entry.applicant || ''}</td>
+                    <td>${entry.municipality || '-'}</td>
+                    <td style="text-align: center;">
+                        <input type="checkbox" ${entry.itemReceived ? 'checked' : ''}
+                               data-action="toggleItem" data-id="${entry.id}"
+                               style="cursor: pointer; width: 18px; height: 18px;">
+                    </td>
+                    <td style="text-align: center;">
+                        <input type="checkbox" ${entry.documentReceived ? 'checked' : ''}
+                               data-action="toggleDocument" data-id="${entry.id}"
+                               style="cursor: pointer; width: 18px; height: 18px;">
+                    </td>
+                    <td style="text-align: center;">
+                        <button class="btn-icon furusato-edit-btn" data-id="${entry.id}" title="編集">✏️</button>
+                        <button class="btn-icon furusato-delete-btn" data-id="${entry.id}" title="削除">🗑️</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                </tbody>
+            </table>
+        `;
+
+        container.innerHTML = html;
+
+        // イベントリスナーを設定
+        this.attachEventListeners();
+    }
+
+    attachEventListeners() {
+        const container = document.getElementById('furusatoTableContainer');
+
+        // 編集ボタン
+        container.querySelectorAll('.furusato-edit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.getAttribute('data-id');
+                console.log('Edit button clicked, ID:', id);
+                this.editEntry(id);
+            });
+        });
+
+        // 削除ボタン
+        container.querySelectorAll('.furusato-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const id = e.currentTarget.getAttribute('data-id');
+                this.deleteEntry(id);
+            });
+        });
+
+        // チェックボックス
+        container.querySelectorAll('input[type="checkbox"][data-action]').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const id = e.currentTarget.getAttribute('data-id');
+                const action = e.currentTarget.getAttribute('data-action');
+                if (action === 'toggleItem') {
+                    this.toggleItem(id);
+                } else if (action === 'toggleDocument') {
+                    this.toggleDocument(id);
+                }
+            });
+        });
+    }
+
+    openModal(entry = null) {
+        const modal = document.getElementById('furusatoModal');
+        const title = document.getElementById('furusatoModalTitle');
+        const form = document.getElementById('furusatoForm');
+
+        // フォームを完全にリセット
+        form.reset();
+
+        if (entry) {
+            // 編集モード
+            title.textContent = 'ふるさと納税を編集';
+            document.getElementById('furusatoId').value = entry.id;
+            document.getElementById('furusatoYearInput').value = entry.year;
+            document.getElementById('furusatoAmount').value = entry.amount;
+            document.getElementById('furusatoItem').value = entry.item;
+            document.getElementById('furusatoApplicant').value = entry.applicant || '';
+            document.getElementById('furusatoMunicipality').value = entry.municipality || '';
+            this.editingId = entry.id;
+        } else {
+            // 新規追加モード
+            title.textContent = 'ふるさと納税を追加';
+            document.getElementById('furusatoId').value = '';
+            document.getElementById('furusatoYearInput').value = this.currentYear;
+            document.getElementById('furusatoAmount').value = '';
+            document.getElementById('furusatoItem').value = '';
+            document.getElementById('furusatoApplicant').value = '';
+            document.getElementById('furusatoMunicipality').value = '';
+            this.editingId = null;
+        }
+
+        modal.style.display = 'block';
+    }
+
+    closeModal() {
+        document.getElementById('furusatoModal').style.display = 'none';
+        this.editingId = null;
+    }
+
+    saveEntry() {
+        const entry = {
+            year: document.getElementById('furusatoYearInput').value,
+            amount: document.getElementById('furusatoAmount').value,
+            item: document.getElementById('furusatoItem').value,
+            applicant: document.getElementById('furusatoApplicant').value,
+            municipality: document.getElementById('furusatoMunicipality').value
+        };
+
+        if (this.editingId) {
+            this.manager.update(this.editingId, entry);
+        } else {
+            this.manager.add(entry);
+        }
+
+        this.closeModal();
+        this.currentYear = entry.year;
+        document.getElementById('furusatoYear').value = entry.year;
+        this.render();
+    }
+
+    editEntry(id) {
+        console.log('Editing entry with ID:', id);
+        const entry = this.manager.getAll().find(e => e.id === id);
+        console.log('Found entry:', entry);
+        if (entry) {
+            this.openModal(entry);
+        } else {
+            alert('エントリが見つかりませんでした。ID: ' + id);
+        }
+    }
+
+    deleteEntry(id) {
+        if (confirm('このふるさと納税データを削除しますか？')) {
+            this.manager.delete(id);
+            this.render();
+        }
+    }
+
+    toggleItem(id) {
+        this.manager.toggleItemReceived(id);
+    }
+
+    toggleDocument(id) {
+        this.manager.toggleDocumentReceived(id);
+    }
+
+    importFromExpenses() {
+        if (!confirm('支出データから小項目「ふるさと納税」のデータをインポートしますか？\n\n既存のデータと重複するものはスキップされます。')) {
+            return;
+        }
+
+        // 全支出データから小項目「ふるさと納税」を抽出
+        const allExpenses = this.expenseManager.getAllExpenses();
+        const furusatoExpenses = allExpenses.filter(e =>
+            e.subcategory && e.subcategory.includes('ふるさと納税')
+        );
+
+        if (furusatoExpenses.length === 0) {
+            alert('小項目「ふるさと納税」のデータが見つかりませんでした。');
+            return;
+        }
+
+        // データ変換
+        const convertedData = furusatoExpenses.map(expense => {
+            const date = new Date(expense.date);
+            return {
+                year: date.getFullYear().toString(),
+                amount: parseInt(expense.amount),
+                item: expense.description || '（商品名なし）',
+                applicant: expense.place || '（申請先不明）',
+                municipality: ''
+            };
+        });
+
+        // インポート実行
+        const result = this.manager.importFromExpenses(convertedData);
+
+        alert(`インポート完了\n\n新規追加: ${result.importedCount}件\n重複でスキップ: ${result.skippedCount}件`);
+
+        // 表示を更新
+        this.render();
+    }
+}
+
+// ========================================
 // アプリ初期化
 // ========================================
 
 const manager = new ExpenseManager();
 const ui = new UI(manager);
+const furusatoManager = new FurusatoManager();
+const furusatoUI = new FurusatoUI(furusatoManager, manager);
 
 // アニメーション用CSS
 const style = document.createElement('style');
