@@ -326,7 +326,7 @@ td {
 }
 
 /* 一覧の金額列を少し大きく */
-table tbody tr td:nth-child(4) {
+#expenseTable tbody tr td:nth-child(4) {
     font-size: 14px;
     font-weight: 500;
 }
