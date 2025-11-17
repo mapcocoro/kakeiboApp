@@ -11,6 +11,7 @@
         <header>
             <h1>💰 家計簿アプリ</h1>
             <div class="header-actions">
+                <button id="removeDuplicatesBtn" class="btn btn-secondary">重複削除</button>
                 <button id="exportBtn" class="btn btn-secondary">データエクスポート</button>
                 <button id="importBtn" class="btn btn-secondary">データインポート</button>
             </div>
@@ -41,12 +42,12 @@
                             <thead>
                                 <tr>
                                     <th>日付</th>
-                                    <th>カテゴリ</th>
-                                    <th>小項目</th>
+                                    <th>場所</th>
                                     <th>金額</th>
                                     <th>税込</th>
-                                    <th>場所</th>
                                     <th>商品名</th>
+                                    <th>カテゴリ</th>
+                                    <th>小項目</th>
                                     <th>メモ</th>
                                     <th></th>
                                 </tr>
@@ -54,6 +55,10 @@
                             <tbody>
                                 <tr>
                                     <td><input type="date" id="date" required></td>
+                                    <td><input type="text" id="place" placeholder="場所"></td>
+                                    <td><input type="number" id="amount" min="0" placeholder="金額" required></td>
+                                    <td><button type="button" class="tax-btn" id="normalTaxBtn">税込</button></td>
+                                    <td><input type="text" id="description" placeholder="商品名"></td>
                                     <td>
                                         <select id="category" required>
                                             <option value="">選択</option>
@@ -82,10 +87,6 @@
                                             <option value="">選択</option>
                                         </select>
                                     </td>
-                                    <td><input type="number" id="amount" min="0" placeholder="金額" required></td>
-                                    <td><button type="button" class="tax-btn" id="normalTaxBtn">税込</button></td>
-                                    <td><input type="text" id="place" placeholder="場所"></td>
-                                    <td><input type="text" id="description" placeholder="商品名"></td>
                                     <td><input type="text" id="notes" placeholder="メモ"></td>
                                     <td><button type="submit" class="btn btn-primary">記録</button></td>
                                 </tr>

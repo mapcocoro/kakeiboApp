@@ -193,6 +193,67 @@ class ExpenseManager {
         this.saveExpenses();
     }
 
+    // 特定のデータが既存データと重複しているかチェック
+    isDuplicate(expense) {
+        const key = `${expense.date}|${expense.category}|${expense.subcategory || ''}|${expense.amount}|${expense.place || ''}|${expense.description || ''}`;
+        return this.expenses.some(e => {
+            const existingKey = `${e.date}|${e.category}|${e.subcategory || ''}|${e.amount}|${e.place || ''}|${e.description || ''}`;
+            return existingKey === key;
+        });
+    }
+
+    // 重複データを検出
+    findDuplicates() {
+        const duplicates = [];
+        const seen = new Map();
+
+        this.expenses.forEach((expense, index) => {
+            // 重複判定用のキーを生成（日付、カテゴリ、小項目、金額、場所、商品名）
+            const key = `${expense.date}|${expense.category}|${expense.subcategory || ''}|${expense.amount}|${expense.place || ''}|${expense.description || ''}`;
+
+            if (seen.has(key)) {
+                // 重複データを記録
+                const originalIndex = seen.get(key);
+                if (!duplicates.find(d => d.key === key)) {
+                    duplicates.push({
+                        key,
+                        indices: [originalIndex, index],
+                        ids: [this.expenses[originalIndex].id, expense.id],
+                        data: expense
+                    });
+                } else {
+                    const dup = duplicates.find(d => d.key === key);
+                    dup.indices.push(index);
+                    dup.ids.push(expense.id);
+                }
+            } else {
+                seen.set(key, index);
+            }
+        });
+
+        return duplicates;
+    }
+
+    // 重複データを削除（最初の1件を残して、残りを削除）
+    removeDuplicates() {
+        const duplicates = this.findDuplicates();
+        let removedCount = 0;
+
+        duplicates.forEach(dup => {
+            // 最初のID以外を削除
+            for (let i = 1; i < dup.ids.length; i++) {
+                this.expenses = this.expenses.filter(e => e.id !== dup.ids[i]);
+                removedCount++;
+            }
+        });
+
+        if (removedCount > 0) {
+            this.saveExpenses();
+        }
+
+        return { duplicateGroups: duplicates.length, removedCount };
+    }
+
     // すべての支出を取得
     getAllExpenses() {
         // 元の配列を変更しないようにコピーを返す
@@ -537,6 +598,10 @@ class UI {
         });
 
         // エクスポート・インポート
+        document.getElementById('removeDuplicatesBtn').addEventListener('click', () => {
+            this.removeDuplicateData();
+        });
+
         document.getElementById('exportBtn').addEventListener('click', () => {
             this.exportData();
         });
@@ -2766,6 +2831,43 @@ class UI {
         return '\uFEFF' + csv; // BOM追加でExcelで文字化け防止
     }
 
+    // 重複データを削除
+    removeDuplicateData() {
+        // まず重複を検出
+        const duplicates = this.manager.findDuplicates();
+
+        if (duplicates.length === 0) {
+            alert('重複データは見つかりませんでした。');
+            return;
+        }
+
+        // 重複データの詳細を表示
+        let message = `${duplicates.length}グループの重複データが見つかりました。\n\n`;
+        message += '以下のデータが重複しています：\n\n';
+
+        duplicates.slice(0, 5).forEach((dup, index) => {
+            const data = dup.data;
+            message += `${index + 1}. ${data.date} - ${data.category}`;
+            if (data.subcategory) message += ` (${data.subcategory})`;
+            message += ` - ${data.amount}円`;
+            if (data.place) message += ` - ${data.place}`;
+            if (data.description) message += ` - ${data.description}`;
+            message += ` (${dup.ids.length}件)\n`;
+        });
+
+        if (duplicates.length > 5) {
+            message += `\n... 他 ${duplicates.length - 5}グループ\n`;
+        }
+
+        message += '\n各グループの最初の1件を残して、残りを削除しますか？';
+
+        if (confirm(message)) {
+            const result = this.manager.removeDuplicates();
+            this.renderExpenseList();
+            alert(`重複削除完了\n\n削除件数: ${result.removedCount}件\n（${result.duplicateGroups}グループ）`);
+        }
+    }
+
     // データインポート
     importData() {
         const input = document.createElement('input');
@@ -3107,18 +3209,15 @@ class UI {
         tbody.appendChild(row);
         this.bulkInputRows.push(rowId);
 
-        // 小項目の選択肢を更新
-        if (defaultCategory) {
-            this.updateSubcategoryOptions(rowId);
-        }
+        // 小項目の選択肢を更新（カテゴリが選択されているかどうかに関わらず実行）
+        this.updateSubcategoryOptions(rowId);
 
         // 1行目の場合、カテゴリ変更時に2行目以降も更新するイベントリスナーを追加
         // this.bulkInputRows.lengthはpush後なので、=== 1の時は1行目
         if (this.bulkInputRows.length === 1) {
             const categorySelect = row.querySelector('.bulk-category');
             categorySelect.addEventListener('change', () => {
-                // 1行目のrowIdを使用
-                this.propagateCategoryToOtherRows(rowId);
+                this.propagateCategoryToOtherRows();
             });
         }
     }
@@ -3193,7 +3292,7 @@ class UI {
     }
 
     // 1行目のカテゴリを他の行にも反映
-    propagateCategoryToOtherRows(firstRowId) {
+    propagateCategoryToOtherRows() {
         const tbody = document.getElementById('bulkInputTableBody');
         const firstRow = tbody.querySelector('tr:first-child');
         if (!firstRow) return;
@@ -3331,6 +3430,35 @@ class UI {
                 errors.push(`行${index + 1}: 日付、カテゴリ、金額は必須です`);
             }
         });
+
+        // 重複チェック
+        if (validExpenses.length > 0) {
+            const duplicateExpenses = validExpenses.filter(expense =>
+                this.manager.isDuplicate(expense)
+            );
+
+            // 重複がある場合は警告を表示
+            if (duplicateExpenses.length > 0) {
+                let message = `${duplicateExpenses.length}件の重複データが検出されました。\n\n`;
+                message += '以下のデータが既に登録されています：\n\n';
+                duplicateExpenses.slice(0, 3).forEach((expense, index) => {
+                    message += `${index + 1}. ${expense.date} - ${expense.category}`;
+                    if (expense.subcategory) message += ` (${expense.subcategory})`;
+                    message += ` - ${expense.amount}円`;
+                    if (expense.place) message += ` - ${expense.place}`;
+                    if (expense.description) message += ` - ${expense.description}`;
+                    message += '\n';
+                });
+                if (duplicateExpenses.length > 3) {
+                    message += `\n... 他 ${duplicateExpenses.length - 3}件\n`;
+                }
+                message += '\nそれでも保存しますか？';
+
+                if (!confirm(message)) {
+                    return; // 保存をキャンセル
+                }
+            }
+        }
 
         // 繰り返し処理
         if (validExpenses.length > 0) {
