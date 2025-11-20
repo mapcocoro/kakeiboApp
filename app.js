@@ -695,6 +695,39 @@ class UI {
             const options = document.getElementById('editRepeatOptions');
             options.style.display = e.target.checked ? 'block' : 'none';
         });
+
+        // Topixモーダル: 閉じる
+        document.getElementById('topixModalClose').addEventListener('click', () => {
+            this.closeTopixModal();
+        });
+
+        document.getElementById('cancelTopixBtn').addEventListener('click', () => {
+            this.closeTopixModal();
+        });
+
+        window.addEventListener('click', (e) => {
+            if (e.target.id === 'topixModal') {
+                this.closeTopixModal();
+            }
+        });
+
+        // Topixモーダル: 追加
+        document.getElementById('addTopixBtn').addEventListener('click', () => {
+            this.addNewTopix();
+        });
+
+        // Topixモーダル: 保存
+        document.getElementById('saveTopixBtn').addEventListener('click', () => {
+            this.saveTopixChanges();
+        });
+
+        // Topixモーダル: Enterキーで追加
+        document.getElementById('newTopixInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.addNewTopix();
+            }
+        });
     }
 
     // タブ切り替え
@@ -1466,6 +1499,12 @@ class UI {
                     }
                 }
 
+                // クリックイベントを追加してtopix編集モーダルを開く
+                cell.dataset.yearMonth = m.key;
+                cell.addEventListener('click', () => {
+                    this.openTopixModal(m.key);
+                });
+
                 memoRow.appendChild(cell);
             });
 
@@ -1683,6 +1722,12 @@ class UI {
                     cell.title = event;
                     cell.textContent = preview;
                 }
+
+                // クリックイベントを追加してtopix編集モーダルを開く
+                cell.dataset.yearMonth = m.key;
+                cell.addEventListener('click', () => {
+                    this.openTopixModal(m.key);
+                });
 
                 memoRow.appendChild(cell);
             });
@@ -3504,6 +3549,198 @@ class UI {
         if (errors.length > 0) {
             alert('以下の行に入力エラーがあります:\n' + errors.join('\n'));
         }
+    }
+
+    // ========================================
+    // Topix編集モーダル
+    // ========================================
+
+    // Topixモーダルを開く
+    openTopixModal(yearMonth) {
+        this.currentEditingYearMonth = yearMonth;
+        const memo = this.manager.getMemo(yearMonth);
+        const events = memo.events ? memo.events.split('\n').filter(e => e.trim()) : [];
+
+        // モーダルタイトルと月情報を設定
+        const [year, month] = yearMonth.split('-');
+        document.querySelector('.topix-month-info').textContent = `${year}年${parseInt(month)}月のTopix`;
+
+        // Topixリストを表示
+        this.renderTopixList(events);
+
+        // 入力欄をクリア
+        document.getElementById('newTopixInput').value = '';
+
+        // モーダルを表示
+        document.getElementById('topixModal').style.display = 'block';
+    }
+
+    // Topixリストを描画
+    renderTopixList(events) {
+        const listContainer = document.getElementById('topixList');
+        listContainer.innerHTML = '';
+
+        if (events.length === 0) {
+            listContainer.innerHTML = '<div class="topix-empty-message">Topixがまだ登録されていません</div>';
+            return;
+        }
+
+        events.forEach((event, index) => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'topix-item';
+            itemDiv.dataset.index = index;
+
+            const textDiv = document.createElement('div');
+            textDiv.className = 'topix-item-text';
+            textDiv.textContent = event;
+            textDiv.contentEditable = true;
+
+            // 編集時の処理
+            textDiv.addEventListener('focus', () => {
+                textDiv.classList.add('editing');
+            });
+
+            textDiv.addEventListener('blur', () => {
+                textDiv.classList.remove('editing');
+            });
+
+            // Enterキーで次の項目に移動
+            textDiv.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    textDiv.blur();
+                }
+            });
+
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'topix-item-actions';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'topix-delete-btn';
+            deleteBtn.textContent = '×';
+            deleteBtn.title = '削除';
+            deleteBtn.addEventListener('click', () => {
+                if (confirm('このTopixを削除しますか？')) {
+                    itemDiv.remove();
+                    // 空になった場合はメッセージを表示
+                    if (listContainer.children.length === 0) {
+                        listContainer.innerHTML = '<div class="topix-empty-message">Topixがまだ登録されていません</div>';
+                    }
+                }
+            });
+
+            actionsDiv.appendChild(deleteBtn);
+            itemDiv.appendChild(textDiv);
+            itemDiv.appendChild(actionsDiv);
+            listContainer.appendChild(itemDiv);
+        });
+    }
+
+    // 新しいTopixを追加
+    addNewTopix() {
+        const input = document.getElementById('newTopixInput');
+        const newTopix = input.value.trim();
+
+        if (!newTopix) {
+            return;
+        }
+
+        const listContainer = document.getElementById('topixList');
+
+        // 空メッセージを削除
+        const emptyMessage = listContainer.querySelector('.topix-empty-message');
+        if (emptyMessage) {
+            emptyMessage.remove();
+        }
+
+        // 新しいアイテムを作成
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'topix-item';
+
+        const textDiv = document.createElement('div');
+        textDiv.className = 'topix-item-text';
+        textDiv.textContent = newTopix;
+        textDiv.contentEditable = true;
+
+        textDiv.addEventListener('focus', () => {
+            textDiv.classList.add('editing');
+        });
+
+        textDiv.addEventListener('blur', () => {
+            textDiv.classList.remove('editing');
+        });
+
+        textDiv.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                textDiv.blur();
+            }
+        });
+
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'topix-item-actions';
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'topix-delete-btn';
+        deleteBtn.textContent = '×';
+        deleteBtn.title = '削除';
+        deleteBtn.addEventListener('click', () => {
+            if (confirm('このTopixを削除しますか？')) {
+                itemDiv.remove();
+                if (listContainer.children.length === 0) {
+                    listContainer.innerHTML = '<div class="topix-empty-message">Topixがまだ登録されていません</div>';
+                }
+            }
+        });
+
+        actionsDiv.appendChild(deleteBtn);
+        itemDiv.appendChild(textDiv);
+        itemDiv.appendChild(actionsDiv);
+        listContainer.appendChild(itemDiv);
+
+        // 入力欄をクリア
+        input.value = '';
+        input.focus();
+    }
+
+    // Topix変更を保存
+    saveTopixChanges() {
+        const listContainer = document.getElementById('topixList');
+        const items = listContainer.querySelectorAll('.topix-item');
+
+        // 全てのTopixを配列に収集
+        const events = [];
+        items.forEach(item => {
+            const text = item.querySelector('.topix-item-text').textContent.trim();
+            if (text) {
+                events.push(text);
+            }
+        });
+
+        // メモデータを取得
+        const memo = this.manager.getMemo(this.currentEditingYearMonth);
+
+        // Topixを保存（既存のplansは保持）
+        this.manager.saveMemo(this.currentEditingYearMonth, events.join('\n'), memo.plans || '');
+
+        // モーダルを閉じる
+        this.closeTopixModal();
+
+        // 推移タブが表示されている場合は再描画
+        const activeTab = document.querySelector('.tab-content.active');
+        if (activeTab && activeTab.id === 'timeline-tab') {
+            this.renderTimeline();
+        }
+
+        // 成功メッセージ
+        const [year, month] = this.currentEditingYearMonth.split('-');
+        alert(`${year}年${parseInt(month)}月のTopixを保存しました（${events.length}件）`);
+    }
+
+    // Topixモーダルを閉じる
+    closeTopixModal() {
+        document.getElementById('topixModal').style.display = 'none';
+        this.currentEditingYearMonth = null;
     }
 }
 

@@ -1324,3 +1324,140 @@ td.sticky-col.memo-label {
 #furusatoTableContainer {
     width: 100%;
 }
+
+/* Topix編集モーダル */
+.topix-modal-content {
+    max-width: 600px;
+    max-height: 80vh;
+}
+
+.topix-month-info {
+    padding: 12px;
+    background: #e3f2fd;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a73e8;
+}
+
+.topix-list {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+.topix-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s;
+}
+
+.topix-item:last-child {
+    border-bottom: none;
+}
+
+.topix-item:hover {
+    background: #f8f9fa;
+}
+
+.topix-item-text {
+    flex: 1;
+    font-size: 14px;
+    color: #202124;
+    padding: 4px 8px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+    word-wrap: break-word;
+    transition: border-color 0.2s;
+}
+
+.topix-item-text:hover {
+    border-color: #e0e0e0;
+    background: #fafafa;
+}
+
+.topix-item-text.editing {
+    border-color: #1a73e8;
+    background: white;
+    cursor: text;
+}
+
+.topix-item-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.topix-delete-btn {
+    background: none;
+    border: none;
+    color: #5f6368;
+    cursor: pointer;
+    padding: 4px 8px;
+    font-size: 16px;
+    border-radius: 3px;
+    transition: all 0.2s;
+}
+
+.topix-delete-btn:hover {
+    background: #ffebee;
+    color: #d32f2f;
+}
+
+.topix-add-section {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+#newTopixInput {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+#newTopixInput:focus {
+    outline: none;
+    border-color: #1a73e8;
+}
+
+.topix-empty-message {
+    padding: 40px;
+    text-align: center;
+    color: #5f6368;
+    font-size: 14px;
+}
+
+/* Topixセルのホバー効果 */
+.memo-cell {
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.2s;
+}
+
+.memo-cell:hover {
+    background-color: #f0f7ff !important;
+}
+
+.memo-cell::after {
+    content: '✏️';
+    position: absolute;
+    right: 4px;
+    top: 4px;
+    font-size: 10px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.memo-cell:hover::after {
+    opacity: 0.5;
+}

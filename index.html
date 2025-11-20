@@ -495,6 +495,26 @@
         </div>
     </div>
 
+    <!-- Topix編集モーダル -->
+    <div id="topixModal" class="modal">
+        <div class="modal-content topix-modal-content">
+            <span class="close" id="topixModalClose">&times;</span>
+            <h2 id="topixModalTitle">Topix編集</h2>
+            <div class="topix-month-info"></div>
+            <div class="topix-list" id="topixList">
+                <!-- topixリストがここに表示されます -->
+            </div>
+            <div class="topix-add-section">
+                <input type="text" id="newTopixInput" placeholder="新しいTopixを入力...">
+                <button id="addTopixBtn" class="btn btn-secondary">+ 追加</button>
+            </div>
+            <div class="form-actions">
+                <button id="saveTopixBtn" class="btn btn-primary">保存</button>
+                <button id="cancelTopixBtn" class="btn">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="app.js"></script>
 </body>
