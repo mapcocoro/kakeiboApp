@@ -434,6 +434,7 @@ class UI {
     init() {
         // 変数を先に初期化
         this.bulkInputRows = [];
+        this.bulkRowIdCounter = 0; // 一括入力行のユニークIDカウンター
         this.currentSort = { column: 'date', direction: 'desc' }; // デフォルトは日付降順
         this.displayLimit = 100; // 初期表示件数
         this.displayOffset = 0; // 表示開始位置
@@ -3190,10 +3191,10 @@ class UI {
 
             // 一括入力モードに切り替えたら、初期行を追加
             if (this.bulkInputRows.length === 0) {
-                // 少し遅延を入れてrowIdが重複しないようにする
+                // カウンターベースのIDで重複なく追加
                 this.addBulkInputRow();
-                setTimeout(() => this.addBulkInputRow(), 10);
-                setTimeout(() => this.addBulkInputRow(), 20);
+                this.addBulkInputRow();
+                this.addBulkInputRow();
             }
         }
     }
@@ -3201,7 +3202,8 @@ class UI {
     // 一括入力行を追加
     addBulkInputRow() {
         const tbody = document.getElementById('bulkInputTableBody');
-        const rowId = Date.now();
+        this.bulkRowIdCounter++;
+        const rowId = this.bulkRowIdCounter;
         const today = new Date().toISOString().split('T')[0];
 
         // 既存の1行目からカテゴリを取得（2行目以降の場合）
@@ -3270,10 +3272,8 @@ class UI {
     // 複数行を一度に追加
     addBulkInputRows(count) {
         for (let i = 0; i < count; i++) {
-            // 少しずつIDをずらすため、小さい遅延を入れる
-            setTimeout(() => {
-                this.addBulkInputRow();
-            }, i * 10);
+            // カウンターベースのIDで重複なく追加
+            this.addBulkInputRow();
         }
     }
 
@@ -3537,6 +3537,7 @@ class UI {
             // テーブルをクリア
             tbody.innerHTML = '';
             this.bulkInputRows = [];
+            // bulkRowIdCounterはリセットしない（同じrowIdの再利用を防ぐため）
 
             // 新しい行を3つ追加
             this.addBulkInputRow();
