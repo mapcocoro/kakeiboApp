@@ -722,6 +722,37 @@ class UI {
             this.saveTopixChanges();
         });
 
+        // 一括入力テーブル: イベント委譲で税込・削除ボタンを処理
+        const bulkTableBody = document.getElementById('bulkInputTableBody');
+        bulkTableBody.addEventListener('click', (e) => {
+            const target = e.target;
+            const row = target.closest('tr');
+            if (!row || !row.dataset.rowId) return;
+
+            const rowId = parseInt(row.dataset.rowId);
+            if (target.classList.contains('tax-btn')) {
+                this.applyTax(rowId);
+            } else if (target.classList.contains('delete-row-btn')) {
+                this.deleteBulkInputRow(rowId);
+            }
+        });
+
+        // 一括入力テーブル: カテゴリ変更をイベント委譲で処理
+        bulkTableBody.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.classList.contains('bulk-category')) {
+                const row = target.closest('tr');
+                if (row && row.dataset.rowId) {
+                    const rowId = parseInt(row.dataset.rowId);
+                    this.updateSubcategoryOptions(rowId);
+                    // 1行目のカテゴリ変更の場合、他の行にも反映
+                    if (row === bulkTableBody.querySelector('tr:first-child')) {
+                        this.propagateCategoryToOtherRows();
+                    }
+                }
+            }
+        });
+
         // Topixモーダル: Enterキーで追加
         document.getElementById('newTopixInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
@@ -3219,10 +3250,10 @@ class UI {
             <td><input type="date" class="bulk-date" value="${today}"></td>
             <td><input type="text" class="bulk-place" placeholder="場所"></td>
             <td><input type="number" class="bulk-amount" min="0" placeholder="金額"></td>
-            <td><button class="tax-btn" onclick="ui.applyTax(${rowId})">税込</button></td>
+            <td><button class="tax-btn">税込</button></td>
             <td><input type="text" class="bulk-description" placeholder="商品名"></td>
             <td>
-                <select class="bulk-category" onchange="ui.updateSubcategoryOptions(${rowId})">
+                <select class="bulk-category">
                     <option value="">選択</option>
                     <option value="食品" ${defaultCategory === '食品' ? 'selected' : ''}>食品</option>
                     <option value="日用品" ${defaultCategory === '日用品' ? 'selected' : ''}>日用品</option>
@@ -3250,7 +3281,7 @@ class UI {
                 </select>
             </td>
             <td><input type="text" class="bulk-notes" placeholder="メモ"></td>
-            <td><button class="delete-row-btn" onclick="ui.deleteBulkInputRow(${rowId})">削除</button></td>
+            <td><button class="delete-row-btn">削除</button></td>
         `;
 
         tbody.appendChild(row);
@@ -3258,15 +3289,6 @@ class UI {
 
         // 小項目の選択肢を更新（カテゴリが選択されているかどうかに関わらず実行）
         this.updateSubcategoryOptions(rowId);
-
-        // 1行目の場合、カテゴリ変更時に2行目以降も更新するイベントリスナーを追加
-        // this.bulkInputRows.lengthはpush後なので、=== 1の時は1行目
-        if (this.bulkInputRows.length === 1) {
-            const categorySelect = row.querySelector('.bulk-category');
-            categorySelect.addEventListener('change', () => {
-                this.propagateCategoryToOtherRows();
-            });
-        }
     }
 
     // 複数行を一度に追加
