@@ -53,6 +53,7 @@ class ExpenseManager {
     // レポートを保存
     saveReports() {
         localStorage.setItem('savedReports', JSON.stringify(this.reports));
+        if (window.firebaseSync) window.firebaseSync.save('savedReports', this.reports);
     }
 
     // レポートを追加
@@ -84,6 +85,7 @@ class ExpenseManager {
     // メモを保存
     saveMemos() {
         localStorage.setItem('monthlyMemos', JSON.stringify(this.memos));
+        if (window.firebaseSync) window.firebaseSync.save('monthlyMemos', this.memos);
     }
 
     // 月のメモを取得
@@ -108,6 +110,7 @@ class ExpenseManager {
     // 年度メモを保存
     saveYearMemosToStorage() {
         localStorage.setItem('yearMemos', JSON.stringify(this.yearMemos));
+        if (window.firebaseSync) window.firebaseSync.save('yearMemos', this.yearMemos);
     }
 
     // 年度メモを取得
@@ -131,6 +134,8 @@ class ExpenseManager {
             // データサイズをログ出力
             const sizeInMB = (data.length / 1024 / 1024).toFixed(2);
             console.log(`データ保存: ${this.expenses.length}件 (${sizeInMB}MB)`);
+
+            if (window.firebaseSync) window.firebaseSync.save('expenses', this.expenses);
         } catch (error) {
             if (error.name === 'QuotaExceededError') {
                 alert('データ容量が上限を超えました。古いデータを削除するか、データを分割してインポートしてください。');
@@ -3814,6 +3819,7 @@ class FurusatoManager {
 
     saveData() {
         localStorage.setItem(this.storageKey, JSON.stringify(this.data));
+        if (window.firebaseSync) window.firebaseSync.save('furusatoTaxData', this.data);
     }
 
     add(entry) {
@@ -4298,3 +4304,57 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// ========================================
+// Firebase同期初期化
+// ========================================
+
+window.addEventListener('load', async () => {
+    if (typeof firebase === 'undefined' || !window.firebaseSync) return;
+
+    try {
+        const db = firebase.firestore();
+        const loadedFromFirebase = await window.firebaseSync.init(db);
+
+        if (loadedFromFirebase) {
+            // Firestoreから読み込んだデータでマネージャーを更新
+            manager.expenses = manager.loadExpenses();
+            manager.reports = manager.loadReports();
+            manager.memos = manager.loadMemos();
+            manager.yearMemos = manager.loadYearMemos();
+            furusatoManager.loadData();
+
+            // 画面を再描画
+            ui.renderExpenseList();
+            ui.renderTimeline();
+            furusatoUI.render();
+        }
+
+        // 他ユーザーの変更をリアルタイムで検知
+        window.firebaseSync.startListening({
+            'expenses': (data) => {
+                manager.expenses = data;
+                const activeTab = document.querySelector('.tab-btn.active')?.dataset?.tab;
+                if (activeTab === 'list') ui.renderExpenseList();
+                else if (activeTab === 'timeline') ui.renderTimeline();
+                else if (activeTab === 'analysis') ui.updateAnalysis();
+            },
+            'savedReports': (data) => {
+                manager.reports = data;
+            },
+            'monthlyMemos': (data) => {
+                manager.memos = data;
+            },
+            'yearMemos': (data) => {
+                manager.yearMemos = data;
+            },
+            'furusatoTaxData': (data) => {
+                furusatoManager.data = data;
+                const activeTab = document.querySelector('.tab-btn.active')?.dataset?.tab;
+                if (activeTab === 'furusato') furusatoUI.render();
+            }
+        });
+    } catch (error) {
+        console.error('Firebase初期化エラー:', error);
+    }
+});

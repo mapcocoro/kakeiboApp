@@ -11,6 +11,7 @@
         <header>
             <h1>💰 家計簿アプリ</h1>
             <div class="header-actions">
+                <span id="syncIndicator" style="font-size:12px; margin-right:8px;"></span>
                 <button id="removeDuplicatesBtn" class="btn btn-secondary">重複削除</button>
                 <button id="exportBtn" class="btn btn-secondary">データエクスポート</button>
                 <button id="importBtn" class="btn btn-secondary">データインポート</button>
@@ -516,6 +517,13 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <!-- Firebase設定（自分で記入） -->
+    <script src="firebase-config.js"></script>
+    <!-- Firebase同期モジュール -->
+    <script src="firebase-sync.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
