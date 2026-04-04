@@ -35,7 +35,7 @@
 
 const firebaseConfig = {
     apiKey: "AIzaSyDL_PQR-8NDSDiMhV7UwT_s87lHU1d-d1g",
-    authDomain: "kakeibo-8ad7c.firebaseapp.com",
+    authDomain: "kakeibo-8ad7c.web.app",
     projectId: "kakeibo-8ad7c",
     storageBucket: "kakeibo-8ad7c.firebasestorage.app",
     messagingSenderId: "330842348952",
