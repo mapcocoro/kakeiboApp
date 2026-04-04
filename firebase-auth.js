@@ -19,7 +19,6 @@ const firebaseAuth = (() => {
         appContainer.style.display = '';
         userNameEl.textContent = user.displayName || user.email;
 
-        // 初回のみアプリ初期化イベントを発火（ループ防止）
         if (!authInitialized) {
             authInitialized = true;
             window.dispatchEvent(new CustomEvent('authReady', { detail: { user } }));
@@ -40,6 +39,21 @@ const firebaseAuth = (() => {
         loginLoading.style.display = 'block';
         loginBtn.style.display = 'none';
 
+        // リダイレクト結果を処理（Googleログイン後のページ復帰時）
+        try {
+            const result = await firebase.auth().getRedirectResult();
+            if (result.user) {
+                showApp(result.user);
+                return;
+            }
+        } catch (error) {
+            console.error('リダイレクト結果エラー:', error);
+            loginError.textContent = 'エラー: ' + error.code + ' - ' + error.message;
+            loginError.style.display = 'block';
+            showLogin();
+            return;
+        }
+
         // 既存セッションの確認
         firebase.auth().onAuthStateChanged((user) => {
             if (user) {
@@ -49,20 +63,14 @@ const firebaseAuth = (() => {
             }
         });
 
-        // Googleログインボタン（ポップアップ方式）
-        loginBtn.addEventListener('click', async () => {
+        // Googleログインボタン（リダイレクト方式）
+        loginBtn.addEventListener('click', () => {
             loginBtn.disabled = true;
             loginError.style.display = 'none';
+            loginLoading.style.display = 'block';
 
-            try {
-                const provider = new firebase.auth.GoogleAuthProvider();
-                await firebase.auth().signInWithPopup(provider);
-            } catch (error) {
-                console.error('ログインエラー:', error);
-                loginError.textContent = 'エラー: ' + error.code + ' - ' + error.message;
-                loginError.style.display = 'block';
-                loginBtn.disabled = false;
-            }
+            const provider = new firebase.auth.GoogleAuthProvider();
+            firebase.auth().signInWithRedirect(provider);
         });
 
         // ログアウトボタン
