@@ -4306,10 +4306,10 @@ style.textContent = `
 document.head.appendChild(style);
 
 // ========================================
-// Firebase同期初期化
+// Firebase同期初期化（認証完了後に実行）
 // ========================================
 
-window.addEventListener('load', async () => {
+window.addEventListener('authReady', async () => {
     if (typeof firebase === 'undefined' || !window.firebaseSync) return;
 
     try {

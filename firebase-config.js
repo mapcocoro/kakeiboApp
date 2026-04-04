@@ -23,10 +23,13 @@
 //    service cloud.firestore {
 //      match /databases/{database}/documents {
 //        match /kakeiboData/{document} {
-//          allow read, write: if true;
+//          allow read, write: if request.auth != null;
 //        }
 //      }
 //    }
+//
+// 6. Authentication を有効化（左サイドバー「構築」→「Authentication」）:
+//    →「始める」→「Google」プロバイダを有効化 → プロジェクトの公開名を入力 → 保存
 //
 // ========================================
 
