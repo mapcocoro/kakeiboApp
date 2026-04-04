@@ -46,12 +46,11 @@ const firebaseAuth = (() => {
 
             try {
                 const provider = new firebase.auth.GoogleAuthProvider();
-                await firebase.auth().signInWithPopup(provider);
+                await firebase.auth().signInWithRedirect(provider);
             } catch (error) {
                 console.error('ログインエラー:', error);
                 loginError.textContent = 'ログインに失敗しました: ' + error.message;
                 loginError.style.display = 'block';
-            } finally {
                 loginBtn.disabled = false;
             }
         });
