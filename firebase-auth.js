@@ -49,8 +49,10 @@ const firebaseAuth = (() => {
             }
         } catch (error) {
             console.error('リダイレクト結果エラー:', error);
-            loginError.textContent = 'ログインに失敗しました: ' + error.message;
+            loginError.textContent = 'エラー: ' + error.code + ' - ' + error.message;
             loginError.style.display = 'block';
+            showLogin();
+            return; // エラー時はループさせない
         }
 
         // 既存セッションの確認
