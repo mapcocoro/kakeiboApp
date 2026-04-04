@@ -12,52 +12,70 @@ const firebaseAuth = (() => {
     const logoutBtn = document.getElementById('logoutBtn');
     const userNameEl = document.getElementById('userName');
 
-    // 認証状態の変化を監視
-    function init() {
+    let authInitialized = false;
+
+    function showApp(user) {
+        loginScreen.style.display = 'none';
+        appContainer.style.display = '';
+        userNameEl.textContent = user.displayName || user.email;
+
+        // 初回のみアプリ初期化イベントを発火（ループ防止）
+        if (!authInitialized) {
+            authInitialized = true;
+            window.dispatchEvent(new CustomEvent('authReady', { detail: { user } }));
+        }
+    }
+
+    function showLogin() {
+        loginScreen.style.display = 'flex';
+        appContainer.style.display = 'none';
+        loginBtn.style.display = 'inline-flex';
+        loginLoading.style.display = 'none';
+    }
+
+    async function init() {
         if (typeof firebase === 'undefined') return;
 
         // ログイン中の表示
         loginLoading.style.display = 'block';
         loginBtn.style.display = 'none';
 
+        // リダイレクト結果を処理（ページ復帰時）
+        try {
+            const result = await firebase.auth().getRedirectResult();
+            if (result.user) {
+                showApp(result.user);
+                return;
+            }
+        } catch (error) {
+            console.error('リダイレクト結果エラー:', error);
+            loginError.textContent = 'ログインに失敗しました: ' + error.message;
+            loginError.style.display = 'block';
+        }
+
+        // 既存セッションの確認
         firebase.auth().onAuthStateChanged((user) => {
-            loginLoading.style.display = 'none';
-
             if (user) {
-                // ログイン成功 → アプリ表示
-                loginScreen.style.display = 'none';
-                appContainer.style.display = '';
-                userNameEl.textContent = user.displayName || user.email;
-
-                // アプリ初期化イベントを発火
-                window.dispatchEvent(new CustomEvent('authReady', { detail: { user } }));
+                showApp(user);
             } else {
-                // 未ログイン → ログイン画面表示
-                loginScreen.style.display = 'flex';
-                appContainer.style.display = 'none';
-                loginBtn.style.display = 'inline-flex';
+                showLogin();
             }
         });
 
         // Googleログインボタン
-        loginBtn.addEventListener('click', async () => {
+        loginBtn.addEventListener('click', () => {
             loginBtn.disabled = true;
             loginError.style.display = 'none';
+            loginLoading.style.display = 'block';
 
-            try {
-                const provider = new firebase.auth.GoogleAuthProvider();
-                await firebase.auth().signInWithRedirect(provider);
-            } catch (error) {
-                console.error('ログインエラー:', error);
-                loginError.textContent = 'ログインに失敗しました: ' + error.message;
-                loginError.style.display = 'block';
-                loginBtn.disabled = false;
-            }
+            const provider = new firebase.auth.GoogleAuthProvider();
+            firebase.auth().signInWithRedirect(provider);
         });
 
         // ログアウトボタン
         logoutBtn.addEventListener('click', async () => {
             if (confirm('ログアウトしますか？')) {
+                authInitialized = false;
                 await firebase.auth().signOut();
             }
         });
