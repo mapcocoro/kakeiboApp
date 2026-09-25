@@ -554,6 +554,11 @@ class UI {
             this.loadMemo();
         });
 
+        // メモ - 対象月を変えたら自動で読み込む（空のまま保存してTopixを消さないように）
+        document.getElementById('memoYearMonth').addEventListener('change', () => {
+            this.loadMemo(true);
+        });
+
         // メモ - 保存ボタン
         document.getElementById('saveMemoBtn').addEventListener('click', () => {
             this.saveMemo();
@@ -598,6 +603,33 @@ class UI {
             this.updateAnalysis();
         });
 
+        // 月の振り返り - 月の切り替え
+        document.getElementById('reviewMonth').addEventListener('change', () => {
+            this.renderMonthReview();
+        });
+        document.getElementById('reviewPrevBtn').addEventListener('click', () => {
+            this.shiftReviewMonth(-1);
+        });
+        document.getElementById('reviewNextBtn').addEventListener('click', () => {
+            this.shiftReviewMonth(1);
+        });
+        document.getElementById('reviewThisMonthBtn').addEventListener('click', () => {
+            document.getElementById('reviewMonth').value = this.getCurrentYearMonth();
+            this.renderMonthReview();
+        });
+
+        // 月の振り返り - カテゴリ行クリックで明細を開閉
+        document.getElementById('reviewCategoryTable').addEventListener('click', (e) => {
+            const row = e.target.closest('tr.review-row');
+            if (!row) return;
+            const detail = row.nextElementSibling;
+            if (detail && detail.classList.contains('review-detail-row')) {
+                const isOpen = detail.style.display !== 'none';
+                detail.style.display = isOpen ? 'none' : 'table-row';
+                row.classList.toggle('open', !isOpen);
+            }
+        });
+
         // 年度メモ保存ボタン
         document.getElementById('saveYearMemoBtn').addEventListener('click', () => {
             this.saveYearMemo();
@@ -617,7 +649,7 @@ class UI {
         });
 
         // モーダル閉じる
-        document.querySelector('.close').addEventListener('click', () => {
+        document.querySelector('#editModal .close').addEventListener('click', () => {
             this.closeModal();
         });
 
@@ -792,6 +824,7 @@ class UI {
                     this.updateAnalysis();
                 } else if (targetTab === 'timeline') {
                     this.renderTimeline();
+                    this.loadMemo(true);
                 }
             });
         });
@@ -857,7 +890,7 @@ class UI {
 
     // デフォルトの日付を今日に設定
     setDefaultDate() {
-        const today = new Date().toISOString().split('T')[0];
+        const today = this.formatLocalDate();
         document.getElementById('date').value = today;
     }
 
@@ -871,14 +904,13 @@ class UI {
         let minYear = 2020;
         let maxYear = currentYear;
         if (expenses.length > 0) {
-            const years = expenses.map(e => new Date(e.date).getFullYear());
+            const years = expenses.map(e => parseInt((e.date || '').substring(0, 4))).filter(y => y > 1900);
             minYear = Math.min(...years, 2020); // 最小でも2020年から
             maxYear = Math.max(...years, currentYear);
         }
 
-        // 未来10年まで拡張
-        const futureYear = currentYear + 10;
-        maxYear = Math.max(maxYear, futureYear);
+        // 来年まで選べるようにする
+        maxYear = Math.max(maxYear, currentYear + 1);
 
         // 最小年から未来年まで
         for (let year = minYear; year <= maxYear; year++) {
@@ -903,14 +935,13 @@ class UI {
         let minYear = 2020;
         let maxYear = currentYear;
         if (expenses.length > 0) {
-            const years = expenses.map(e => new Date(e.date).getFullYear());
+            const years = expenses.map(e => parseInt((e.date || '').substring(0, 4))).filter(y => y > 1900);
             minYear = Math.min(...years, 2020); // 最小でも2020年から
             maxYear = Math.max(...years, currentYear);
         }
 
-        // 未来10年まで拡張
-        const futureYear = currentYear + 10;
-        maxYear = Math.max(maxYear, futureYear);
+        // 来年まで選べるようにする
+        maxYear = Math.max(maxYear, currentYear + 1);
 
         // 最小年から未来年まで
         for (let year = minYear; year <= maxYear; year++) {
@@ -925,16 +956,46 @@ class UI {
             endSelect.appendChild(option2);
         }
 
-        // デフォルトは全期間（最小年から現在年まで）
-        startSelect.value = minYear;
+        // デフォルトは去年から今年まで（それ以前は開始年で選ぶ）
+        startSelect.value = Math.max(minYear, currentYear - 1);
         endSelect.value = currentYear;
     }
 
     // メモの対象月をデフォルト設定
     setDefaultMemoMonth() {
+        document.getElementById('memoYearMonth').value = this.getCurrentYearMonth();
+        document.getElementById('reviewMonth').value = this.getCurrentYearMonth();
+    }
+
+    // 日付をYYYY-MM-DD形式に（ローカル時刻基準。toISOStringはUTCなので朝9時前に前日になる）
+    formatLocalDate(date = new Date()) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    // YYYY-MM-DDに月数を足す（1/31の翌月は2/28のように、その月の末日に丸める）
+    addMonthsToDate(dateStr, delta) {
+        const [y, m, d] = dateStr.split('-').map(Number);
+        const lastDay = new Date(y, m + delta, 0).getDate();
+        return this.formatLocalDate(new Date(y, m - 1 + delta, Math.min(d, lastDay)));
+    }
+
+    // 「毎月繰り返す」のチェックを外して選択肢を閉じる（normal / bulk / edit）
+    resetRepeatOption(prefix) {
+        document.getElementById(`${prefix}RepeatMonthly`).checked = false;
+        document.getElementById(`${prefix}RepeatOptions`).style.display = 'none';
+    }
+
+    // 今月をYYYY-MM形式で取得（ローカル時刻基準）
+    getCurrentYearMonth() {
         const today = new Date();
-        const yearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-        document.getElementById('memoYearMonth').value = yearMonth;
+        return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    // YYYY-MMを指定月数ずらす
+    addMonths(yearMonth, delta) {
+        const [y, m] = yearMonth.split('-').map(Number);
+        const d = new Date(y, m - 1 + delta, 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     }
 
     // 支出追加
@@ -955,14 +1016,11 @@ class UI {
 
         if (repeatCheckbox.checked && repeatMonths > 1) {
             // 複数月分の支出を作成
-            const baseDate = new Date(expense.date);
             for (let i = 0; i < repeatMonths; i++) {
-                const newDate = new Date(baseDate);
-                newDate.setMonth(baseDate.getMonth() + i);
 
                 const repeatedExpense = {
                     ...expense,
-                    date: newDate.toISOString().split('T')[0]
+                    date: this.addMonthsToDate(expense.date, i)
                 };
                 this.manager.addExpense(repeatedExpense);
             }
@@ -976,6 +1034,7 @@ class UI {
 
         // フォームをリセット
         document.getElementById('expenseForm').reset();
+        this.resetRepeatOption('normal');
         this.setDefaultDate();
     }
 
@@ -1093,12 +1152,12 @@ class UI {
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${expense.date || '-'}</td>
-                        <td>${expense.place || '-'}</td>
-                        <td><span class="badge" data-category="${expense.category || ''}">${expense.category || '-'}</span></td>
-                        <td>${expense.subcategory || '-'}</td>
-                        <td>${parseInt(expense.amount || 0).toLocaleString()}円</td>
-                        <td>${expense.description || '-'}</td>
-                        <td>${expense.notes || '-'}</td>
+                        <td>${this.escapeHtml(expense.place || '-')}</td>
+                        <td><span class="badge" data-category="${this.escapeHtml(expense.category || '')}">${this.escapeHtml(expense.category || '-')}</span></td>
+                        <td>${this.escapeHtml(expense.subcategory || '-')}</td>
+                        <td>${(parseInt(expense.amount) || 0).toLocaleString()}円</td>
+                        <td>${this.escapeHtml(expense.description || '-')}</td>
+                        <td>${this.escapeHtml(expense.notes || '-')}</td>
                         <td class="action-buttons">
                             <button class="btn btn-edit" onclick="ui.openEditModal('${expense.id}')">編集</button>
                             <button class="btn btn-danger" onclick="ui.deleteExpense('${expense.id}')">削除</button>
@@ -1230,7 +1289,13 @@ class UI {
 
         // 小項目の選択肢を更新してから値を設定
         this.updateEditSubcategoryOptions();
-        document.getElementById('editSubcategory').value = expense.subcategory || '';
+        const editSubcategory = document.getElementById('editSubcategory');
+        if (expense.subcategory && ![...editSubcategory.options].some(o => o.value === expense.subcategory)) {
+            // 旧名称やCSV由来の小項目も消さずに残す
+            editSubcategory.add(new Option(expense.subcategory, expense.subcategory));
+        }
+        editSubcategory.value = expense.subcategory || '';
+        this.resetRepeatOption('edit');
 
         document.getElementById('editAmount').value = expense.amount;
         document.getElementById('editPlace').value = expense.place || '';
@@ -1267,14 +1332,11 @@ class UI {
 
         if (repeatCheckbox.checked && repeatMonths > 1) {
             // 追加で繰り返し分を作成（2ヶ月目から）
-            const baseDate = new Date(updatedData.date);
             for (let i = 1; i < repeatMonths; i++) {
-                const newDate = new Date(baseDate);
-                newDate.setMonth(baseDate.getMonth() + i);
 
                 const repeatedExpense = {
                     ...updatedData,
-                    date: newDate.toISOString().split('T')[0]
+                    date: this.addMonthsToDate(updatedData.date, i)
                 };
                 this.manager.addExpense(repeatedExpense);
             }
@@ -1393,11 +1455,12 @@ class UI {
         });
 
         // テーブルヘッダーを生成（ソート可能）
+        const currentYearMonth = this.getCurrentYearMonth();
         const thead = document.getElementById('timelineTableHead');
         thead.innerHTML = `
             <tr>
                 <th class="sticky-col sortable-header" data-reset="true" title="クリックで元の順序に戻す" style="cursor: pointer;">カテゴリ</th>
-                ${months.map((m, idx) => `<th class="sortable-header" data-month-index="${idx}" title="クリックでソート">${m.year.toString().substring(2)}.${String(m.month).padStart(2, '0')}</th>`).join('')}
+                ${months.map((m, idx) => `<th class="sortable-header${m.key === currentYearMonth ? ' current-month' : ''}" data-month-index="${idx}" title="クリックでソート">${m.year.toString().substring(2)}.${String(m.month).padStart(2, '0')}</th>`).join('')}
             </tr>
         `;
 
@@ -1460,9 +1523,10 @@ class UI {
         const totalRow = document.createElement('tr');
         totalRow.style.fontWeight = '500';
         totalRow.style.borderTop = '2px solid #202124';
+        totalRow.className = 'total-row';
         const totalCells = months.map(m => {
             const total = categories.reduce((sum, cat) => sum + data[cat][m.key], 0);
-            return `<td>¥${total.toLocaleString()}</td>`;
+            return `<td>${total > 0 ? `¥${total.toLocaleString()}` : ''}</td>`;
         });
         totalRow.innerHTML = `
             <td class="sticky-col">合計</td>
@@ -1474,18 +1538,13 @@ class UI {
         // 各月の出来事を配列として取得
         const monthsEvents = months.map(m => {
             const memo = this.manager.getMemo(m.key);
-            console.log(`Topix取得: ${m.key}`, memo);
             const events = memo.events ? memo.events.trim() : '';
             return events ? events.split('\n').filter(e => e.trim()).slice(0, 10) : [];
         });
 
-        console.log('monthsEvents配列:', monthsEvents);
-        console.log('months配列の長さ:', months.length);
-        console.log('monthsEvents配列の長さ:', monthsEvents.length);
 
         // 常に10行のTopix行を作成
         const topixRowCount = 10;
-        console.log('Topix行数:', topixRowCount);
 
         // 10行のTopix行を作成
         for (let eventIndex = 0; eventIndex < topixRowCount; eventIndex++) {
@@ -1531,9 +1590,6 @@ class UI {
                     cell.title = event;
                     cell.textContent = preview;
 
-                    if (eventIndex === 0 && monthIndex >= 4 && monthIndex < 10) {
-                        console.log(`月${m.key}(index=${monthIndex}): "${preview}"`);
-                    }
                 }
 
                 // クリックイベントを追加してtopix編集モーダルを開く
@@ -1545,8 +1601,14 @@ class UI {
                 memoRow.appendChild(cell);
             });
 
-            console.log(`Topix行${eventIndex}: セル数=${memoRow.children.length - 1}`);
             tbody.appendChild(memoRow);
+        }
+
+        // 今月（なければ最新月）が見える位置まで横スクロール
+        const wrapper = document.querySelector('.timeline-table-wrapper');
+        const targetTh = thead.querySelector('th.current-month') || thead.querySelector('th:last-child');
+        if (wrapper && targetTh) {
+            wrapper.scrollLeft = Math.max(0, targetTh.offsetLeft + targetTh.offsetWidth - wrapper.clientWidth + 160);
         }
     }
 
@@ -1683,6 +1745,7 @@ class UI {
         const totalRow = document.createElement('tr');
         totalRow.style.fontWeight = '500';
         totalRow.style.borderTop = '2px solid #202124';
+        totalRow.className = 'total-row';
         const totalCells = months.map((m, idx) => {
             const total = categories.reduce((sum, cat) => sum + data[cat][m.key], 0);
             const highlight = idx === monthIndex ? 'border: 2px solid #1a73e8; background: #e8f0fe;' : '';
@@ -1709,7 +1772,6 @@ class UI {
         // 各月の出来事を配列として取得
         const monthsEvents = months.map(m => {
             const memo = this.manager.getMemo(m.key);
-            console.log(`Topix取得(ソート後): ${m.key}`, memo);
             const events = memo.events ? memo.events.trim() : '';
             return events ? events.split('\n').filter(e => e.trim()).slice(0, 10) : [];
         });
@@ -1774,18 +1836,18 @@ class UI {
     }
 
     // メモを読み込み
-    loadMemo() {
+    loadMemo(silent = false) {
         const yearMonth = document.getElementById('memoYearMonth').value;
         if (!yearMonth) {
-            alert('対象月を選択してください');
+            if (!silent) alert('対象月を選択してください');
             return;
         }
 
         const memo = this.manager.getMemo(yearMonth);
-        document.getElementById('memoEvents').value = memo.events;
-        document.getElementById('memoPlans').value = memo.plans;
+        document.getElementById('memoEvents').value = memo.events || '';
+        document.getElementById('memoPlans').value = memo.plans || '';
 
-        this.showMessage(`${yearMonth}のメモを読み込みました`);
+        if (!silent) this.showMessage(`${yearMonth}のメモを読み込みました`);
     }
 
     // メモを保存
@@ -1901,6 +1963,9 @@ class UI {
         const selectedCategory = document.getElementById('analysisCategory').value;
         const selectedSubcategory = document.getElementById('analysisSubcategory').value;
 
+        // 月の振り返り（期間・カテゴリの絞り込みとは独立）
+        this.renderMonthReview();
+
         let expenses = this.manager.getAllExpenses();
 
         // 期間フィルター適用
@@ -1983,6 +2048,208 @@ class UI {
         } else {
             document.getElementById('yearMemoCard').style.display = 'none';
         }
+    }
+
+    // 月の振り返り：表示月を前後に移動
+    shiftReviewMonth(delta) {
+        const input = document.getElementById('reviewMonth');
+        input.value = this.addMonths(input.value || this.getCurrentYearMonth(), delta);
+        this.renderMonthReview();
+    }
+
+    // 比較の差分を表示用HTMLに（支出が増えた=赤、減った=緑）
+    formatDiff(current, base) {
+        if (!base) return '<span class="diff-none">—</span>';
+        const diff = current - base;
+        const pct = Math.round((diff / base) * 100);
+        const sign = diff > 0 ? '+' : diff < 0 ? '−' : '±';
+        const cls = diff > 0 ? 'diff-up' : diff < 0 ? 'diff-down' : 'diff-none';
+        return `<span class="${cls}">${sign}${Math.abs(diff).toLocaleString()}円 (${sign}${Math.abs(pct)}%)</span>`;
+    }
+
+    // 月の振り返り（選んだ月の支出を先月・平均・前年同月と比べる）
+    renderMonthReview() {
+        const input = document.getElementById('reviewMonth');
+        if (!input.value) input.value = this.getCurrentYearMonth();
+        const ym = input.value;
+        const [year, month] = ym.split('-').map(Number);
+        const prevYm = this.addMonths(ym, -1);
+        const lastYearYm = this.addMonths(ym, -12);
+
+        // 表示月が進行中なら、先月・前年同月は「同じ日まで」で比べる
+        const isCurrent = ym === this.getCurrentYearMonth();
+        const today = new Date().getDate();
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const cutoffDay = isCurrent ? today : 31;
+
+        // 年月ごと・カテゴリごとに集計
+        const byMonth = {};      // YYYY-MM -> { total, cats: { カテゴリ: 金額 } }
+        const byMonthToDay = {}; // YYYY-MM -> 1日〜cutoffDayまでの合計
+        const monthExpenses = [];
+        this.manager.getAllExpenses().forEach(e => {
+            if (!e.date) return;
+            const key = e.date.substring(0, 7);
+            const amount = parseInt(e.amount) || 0;
+            if (!byMonth[key]) byMonth[key] = { total: 0, cats: {} };
+            byMonth[key].total += amount;
+            byMonth[key].cats[e.category] = (byMonth[key].cats[e.category] || 0) + amount;
+            if (parseInt(e.date.substring(8, 10)) <= cutoffDay) {
+                byMonthToDay[key] = (byMonthToDay[key] || 0) + amount;
+            }
+            if (key === ym) monthExpenses.push(e);
+        });
+
+        // 平均は直前12ヶ月のうちデータがある月だけで出す
+        const avgMonths = [];
+        for (let i = 1; i <= 12; i++) {
+            const key = this.addMonths(ym, -i);
+            if (byMonth[key]) avgMonths.push(key);
+        }
+        const avgOf = (getter) => avgMonths.length
+            ? Math.round(avgMonths.reduce((sum, key) => sum + getter(byMonth[key]), 0) / avgMonths.length)
+            : 0;
+
+        const current = byMonth[ym] || { total: 0, cats: {} };
+        const prev = byMonth[prevYm] || { total: 0, cats: {} };
+        const avgTotal = avgOf(m => m.total);
+        const prevBase = isCurrent ? (byMonthToDay[prevYm] || 0) : prev.total;
+        const lastYearBase = isCurrent ? (byMonthToDay[lastYearYm] || 0) : (byMonth[lastYearYm]?.total || 0);
+
+        document.getElementById('reviewTitle').textContent = `${year}年${month}月の振り返り`;
+
+        // ---- サマリー ----
+        let paceHtml = '';
+        if (isCurrent && avgTotal > 0) {
+            const usedPct = Math.round((current.total / avgTotal) * 100);
+            const elapsedPct = Math.round((today / daysInMonth) * 100);
+            paceHtml = `
+                <div class="pace-bar" title="バー：平均に対して使った割合 / 線：月の経過">
+                    <div class="pace-fill${usedPct > elapsedPct ? ' over' : ''}" style="width:${Math.min(usedPct, 100)}%"></div>
+                    <div class="pace-marker" style="left:${elapsedPct}%"></div>
+                </div>
+                <div class="review-tile-sub">平均の${usedPct}%を使用・月の${elapsedPct}%が経過</div>
+            `;
+        }
+
+        document.getElementById('reviewSummary').innerHTML = `
+            <div class="review-tile review-tile-main">
+                <div class="review-tile-label">支出合計</div>
+                <div class="review-tile-value">${current.total.toLocaleString()}円</div>
+                <div class="review-tile-sub">${isCurrent ? `${month}/${today}時点・` : ''}${monthExpenses.length}件</div>
+            </div>
+            <div class="review-tile">
+                <div class="review-tile-label">${isCurrent ? '先月の同じ日までと比べて' : '先月と比べて'}</div>
+                <div class="review-tile-value small">${this.formatDiff(current.total, prevBase)}</div>
+                <div class="review-tile-sub">先月${isCurrent ? `（${today}日まで）` : ''}：${prevBase.toLocaleString()}円</div>
+            </div>
+            <div class="review-tile">
+                <div class="review-tile-label">平均と比べて</div>
+                <div class="review-tile-value small">${this.formatDiff(current.total, avgTotal)}</div>
+                <div class="review-tile-sub">${avgMonths.length ? `直近${avgMonths.length}ヶ月の月平均：${avgTotal.toLocaleString()}円` : '比べられる過去のデータがありません'}</div>
+                ${paceHtml}
+            </div>
+            <div class="review-tile">
+                <div class="review-tile-label">${isCurrent ? '去年の同じ日までと比べて' : '去年の同じ月と比べて'}</div>
+                <div class="review-tile-value small">${lastYearBase ? this.formatDiff(current.total, lastYearBase) : '<span class="diff-none">データなし</span>'}</div>
+                <div class="review-tile-sub">${year - 1}年${month}月：${lastYearBase.toLocaleString()}円</div>
+            </div>
+        `;
+
+        // ---- カテゴリ別の比較表 ----
+        const categorySet = new Set([...Object.keys(current.cats), ...Object.keys(prev.cats)]);
+        avgMonths.forEach(key => Object.keys(byMonth[key].cats).forEach(cat => categorySet.add(cat)));
+
+        const rows = [...categorySet].map(cat => ({
+            cat,
+            cur: current.cats[cat] || 0,
+            prev: prev.cats[cat] || 0,
+            avg: avgOf(m => m.cats[cat] || 0)
+        }))
+            .filter(r => r.cur || r.prev || r.avg)
+            .sort((a, b) => (b.cur - a.cur) || (b.avg - a.avg));
+
+        const container = document.getElementById('reviewCategoryTable');
+        if (rows.length === 0) {
+            container.innerHTML = '<p class="review-empty">この月と直近12ヶ月の支出データがありません</p>';
+            return;
+        }
+
+        const detailsByCat = {};
+        monthExpenses
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .forEach(e => (detailsByCat[e.category] = detailsByCat[e.category] || []).push(e));
+
+        const rowHtml = rows.map(r => {
+            const over = r.cur - r.avg;
+            let flag = '';
+            if (over >= 3000 && (r.avg === 0 || over / r.avg >= 0.2)) {
+                flag = 'flag-over';
+            } else if (!isCurrent && -over >= 3000 && r.avg > 0 && -over / r.avg >= 0.2) {
+                // 月の途中は「少ない」とは言えないので、確定した月だけ
+                flag = 'flag-under';
+            }
+            const share = current.total > 0 ? Math.round((r.cur / current.total) * 100) : 0;
+            const details = detailsByCat[r.cat] || [];
+            const detailHtml = details.length
+                ? `<table class="review-detail-table">${details.map(e => `
+                        <tr>
+                            <td>${Number(e.date.substring(5, 7))}/${Number(e.date.substring(8, 10))}</td>
+                            <td>${this.escapeHtml(e.subcategory || '-')}</td>
+                            <td>${this.escapeHtml(e.place || '')}</td>
+                            <td>${this.escapeHtml(e.description || '')}</td>
+                            <td class="num">${(parseInt(e.amount) || 0).toLocaleString()}円</td>
+                        </tr>`).join('')}</table>`
+                : '<p class="review-empty">この月の明細はありません</p>';
+
+            return `
+                <tr class="review-row ${flag}">
+                    <td><span class="badge" data-category="${this.escapeHtml(r.cat)}">${this.escapeHtml(r.cat)}</span></td>
+                    <td class="num strong">${r.cur.toLocaleString()}円</td>
+                    <td>
+                        <div class="share-cell">
+                            <div class="share-bar"><div class="share-fill" style="width:${share}%; background:${this.getCategoryColorWithAlpha(r.cat, 0.7)}"></div></div>
+                            <span>${share}%</span>
+                        </div>
+                    </td>
+                    <td class="num muted">${r.prev.toLocaleString()}円</td>
+                    <td class="num muted">${r.avg.toLocaleString()}円</td>
+                    <td class="num">${r.avg ? this.formatDiff(r.cur, r.avg) : '<span class="diff-none">—</span>'}</td>
+                </tr>
+                <tr class="review-detail-row" style="display:none">
+                    <td colspan="6">${detailHtml}</td>
+                </tr>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <table class="review-table">
+                <thead>
+                    <tr>
+                        <th>カテゴリ</th>
+                        <th class="num">${month}月</th>
+                        <th>構成比</th>
+                        <th class="num">先月（${Number(prevYm.substring(5, 7))}月）</th>
+                        <th class="num">月平均</th>
+                        <th class="num">平均との差</th>
+                    </tr>
+                </thead>
+                <tbody>${rowHtml}</tbody>
+                <tfoot>
+                    <tr>
+                        <td>合計</td>
+                        <td class="num strong">${current.total.toLocaleString()}円</td>
+                        <td></td>
+                        <td class="num muted">${prev.total.toLocaleString()}円</td>
+                        <td class="num muted">${avgTotal.toLocaleString()}円</td>
+                        <td class="num">${this.formatDiff(current.total, avgTotal)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <p class="review-note">
+                行をクリックすると、その月の明細が開きます。赤い行は平均より2割以上（3,000円以上）多いカテゴリです。
+                ${isCurrent ? `<br>今月は${today}日までの集計です。先月・月平均は1ヶ月分の金額です。` : ''}
+            </p>
+        `;
     }
 
     // 簡易統計表示（小項目選択時）
@@ -2130,18 +2397,43 @@ class UI {
     renderCategoryStats(expenses) {
         const categoryTotals = this.manager.getCategoryTotals(expenses);
         const container = document.getElementById('categoryStats');
+        const total = Object.values(categoryTotals).reduce((sum, v) => sum + (v || 0), 0);
+        const monthCount = new Set(expenses.map(e => (e.date || '').substring(0, 7))).size;
 
-        container.innerHTML = '';
-        Object.entries(categoryTotals).forEach(([category, amount]) => {
-            const stat = document.createElement('div');
-            stat.className = 'category-stat';
-            stat.setAttribute('data-category', category);
-            stat.innerHTML = `
-                <h4>${category}</h4>
-                <div class="amount">${amount.toLocaleString()}円</div>
-            `;
-            container.appendChild(stat);
-        });
+        container.innerHTML = `
+            <div class="category-summary">
+                <div class="summary-item">
+                    <span>合計金額:</span>
+                    <strong>${total.toLocaleString()}円</strong>
+                </div>
+                <div class="summary-item">
+                    <span>月平均${monthCount > 1 ? `（${monthCount}ヶ月）` : ''}:</span>
+                    <strong>${(monthCount ? Math.round(total / monthCount) : 0).toLocaleString()}円</strong>
+                </div>
+                <div class="summary-item">
+                    <span>件数:</span>
+                    <strong>${expenses.length}件</strong>
+                </div>
+            </div>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+        `;
+
+        // 金額の大きい順に並べる
+        Object.entries(categoryTotals)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([category, amount]) => {
+                const stat = document.createElement('div');
+                stat.className = 'category-stat';
+                stat.setAttribute('data-category', category);
+                const percentage = total > 0 ? Math.round((amount / total) * 100) : 0;
+                const monthlyAvg = monthCount > 1 ? `<div class="stat-sub">月平均 ${Math.round(amount / monthCount).toLocaleString()}円</div>` : '';
+                stat.innerHTML = `
+                    <h4>${this.escapeHtml(category)}</h4>
+                    <div class="amount">${amount.toLocaleString()}円 <span class="stat-pct">${percentage}%</span></div>
+                    ${monthlyAvg}
+                `;
+                container.appendChild(stat);
+            });
     }
 
     // 小項目別統計表示
@@ -2259,6 +2551,7 @@ class UI {
             options = {
                 responsive: true,
                 maintainAspectRatio: true,
+                aspectRatio: 3,
                 plugins: {
                     legend: {
                         display: true,
@@ -2323,6 +2616,7 @@ class UI {
             options = {
                 responsive: true,
                 maintainAspectRatio: true,
+                aspectRatio: 3,
                 plugins: {
                     legend: {
                         display: false
@@ -2379,53 +2673,61 @@ class UI {
     renderMonthlyDataTable(expenses) {
         const container = document.getElementById('monthlyDataTable');
 
-        // 月ごとにデータを集計
-        const monthlyDetails = Array(12).fill(null).map(() => ({
-            count: 0,
-            total: 0
-        }));
-
+        // 年月ごとにデータを集計（別の年の同じ月を混ぜない）
+        const monthlyDetails = {};
         expenses.forEach(e => {
-            const date = new Date(e.date);
-            const month = date.getMonth();
-            monthlyDetails[month].count++;
-            monthlyDetails[month].total += parseInt(e.amount);
+            if (!e.date) return;
+            const yearMonth = e.date.substring(0, 7);
+            if (!monthlyDetails[yearMonth]) monthlyDetails[yearMonth] = { count: 0, total: 0 };
+            monthlyDetails[yearMonth].count++;
+            monthlyDetails[yearMonth].total += parseInt(e.amount) || 0;
         });
 
-        // テーブルHTML生成
+        const keys = Object.keys(monthlyDetails).sort();
+        if (keys.length === 0) {
+            container.innerHTML = '<p class="review-empty">この条件の支出はありません</p>';
+            return;
+        }
+
+        // テーブルHTML生成（新しい月が上）
         let html = `
             <table class="monthly-data-table">
                 <thead>
                     <tr>
-                        <th>月</th>
+                        <th>年月</th>
                         <th>件数</th>
                         <th>合計金額</th>
-                        <th>平均</th>
+                        <th>前月比</th>
                     </tr>
                 </thead>
                 <tbody>
         `;
 
-        monthlyDetails.forEach((detail, index) => {
-            const monthName = `${index + 1}月`;
-            const count = detail.count;
-            const total = detail.total;
-            const average = count > 0 ? Math.round(total / count) : 0;
-
-            if (count > 0) {
-                html += `
+        [...keys].reverse().forEach(yearMonth => {
+            const detail = monthlyDetails[yearMonth];
+            const prevDetail = monthlyDetails[this.addMonths(yearMonth, -1)];
+            const [y, m] = yearMonth.split('-');
+            html += `
                     <tr>
-                        <td>${monthName}</td>
-                        <td>${count}件</td>
-                        <td>${total.toLocaleString()}円</td>
-                        <td>${average.toLocaleString()}円</td>
+                        <td>${y}年${Number(m)}月</td>
+                        <td>${detail.count}件</td>
+                        <td>${detail.total.toLocaleString()}円</td>
+                        <td>${prevDetail ? this.formatDiff(detail.total, prevDetail.total) : '<span class="diff-none">—</span>'}</td>
                     </tr>
-                `;
-            }
+            `;
         });
 
+        const grandTotal = keys.reduce((sum, k) => sum + monthlyDetails[k].total, 0);
         html += `
                 </tbody>
+                <tfoot>
+                    <tr>
+                        <td>月平均</td>
+                        <td>${keys.length}ヶ月</td>
+                        <td>${Math.round(grandTotal / keys.length).toLocaleString()}円</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
             </table>
         `;
 
@@ -2594,9 +2896,10 @@ class UI {
         const totalRow = document.createElement('tr');
         totalRow.style.fontWeight = '500';
         totalRow.style.borderTop = '2px solid #202124';
+        totalRow.className = 'total-row';
         const totalCells = months.map(m => {
             const total = categories.reduce((sum, cat) => sum + data[cat][m.key], 0);
-            return `<td>¥${total.toLocaleString()}</td>`;
+            return `<td>${total > 0 ? `¥${total.toLocaleString()}` : ''}</td>`;
         });
         totalRow.innerHTML = `
             <td class="sticky-col">合計</td>
@@ -2698,6 +3001,7 @@ class UI {
         const totalRow = document.createElement('tr');
         totalRow.style.fontWeight = '500';
         totalRow.style.borderTop = '2px solid #202124';
+        totalRow.className = 'total-row';
         const totalCells = months.map((m, idx) => {
             const total = categories.reduce((sum, cat) => sum + data[cat][m.key], 0);
             const highlight = idx === monthIndex ? 'border: 2px solid #1a73e8; background: #e8f0fe;' : '';
@@ -2767,7 +3071,7 @@ class UI {
         if (activeTab === 'list') {
             // 一覧タブ：フィルター適用後のデータをエクスポート
             data = this.filteredExpenses;
-            filename = `家計簿_一覧_${new Date().toISOString().split('T')[0]}.csv`;
+            filename = `家計簿_一覧_${this.formatLocalDate()}.csv`;
             csv = this.convertToCSV(data);
             this.showMessage(`フィルター適用後のデータ（${data.length}件）をエクスポートしました`);
         } else if (activeTab === 'analysis') {
@@ -2777,12 +3081,12 @@ class UI {
                 return;
             }
             csv = this.convertAnalysisToCSV(this.analysisData);
-            filename = `家計簿_分析_${new Date().toISOString().split('T')[0]}.csv`;
+            filename = `家計簿_分析_${this.formatLocalDate()}.csv`;
             this.showMessage(`分析結果（${this.analysisData.expenses.length}件）をエクスポートしました`);
         } else {
             // その他のタブ：全データをエクスポート
             data = this.manager.getAllExpenses();
-            filename = `家計簿_全データ_${new Date().toISOString().split('T')[0]}.csv`;
+            filename = `家計簿_全データ_${this.formatLocalDate()}.csv`;
             csv = this.convertToCSV(data);
             this.showMessage(`全データ（${data.length}件）をエクスポートしました`);
         }
@@ -2798,21 +3102,25 @@ class UI {
 
     // CSVに変換
     convertToCSV(data) {
-        const headers = ['日付', 'カテゴリ', '小項目', '金額', '場所', '商品名・メモ'];
+        const headers = ['日付', 'カテゴリ', '小項目', '金額', '場所', '商品名・メモ', '備考'];
         const rows = data.map(e => [
             e.date,
             e.category,
             e.subcategory || '',
             e.amount,
             e.place || '',
-            e.description || ''
+            e.description || '',
+            e.notes || ''
         ]);
 
-        const csv = [headers, ...rows]
-            .map(row => row.map(cell => `"${cell}"`).join(','))
-            .join('\n');
+        return '\uFEFF' + this.rowsToCSV([headers, ...rows]); // BOM追加でExcelで文字化け防止
+    }
 
-        return '\uFEFF' + csv; // BOM追加でExcelで文字化け防止
+    // 行の配列をCSV文字列に（値の中の " は "" にエスケープ）
+    rowsToCSV(rows) {
+        return rows
+            .map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+            .join('\n');
     }
 
     // 分析データをCSVに変換
@@ -2893,7 +3201,7 @@ class UI {
         // 明細データ
         headerInfo.push(['', '']);
         headerInfo.push(['=== 明細データ ===']);
-        const detailHeaders = ['日付', 'カテゴリ', '小項目', '金額', '場所', '商品名・メモ'];
+        const detailHeaders = ['日付', 'カテゴリ', '小項目', '金額', '場所', '商品名・メモ', '備考'];
         headerInfo.push(detailHeaders);
 
         const detailRows = expenses.map(e => [
@@ -2902,15 +3210,12 @@ class UI {
             e.subcategory || '',
             e.amount,
             e.place || '',
-            e.description || ''
+            e.description || '',
+            e.notes || ''
         ]);
 
         const allRows = [...headerInfo, ...detailRows];
-        const csv = allRows
-            .map(row => row.map(cell => `"${cell}"`).join(','))
-            .join('\n');
-
-        return '\uFEFF' + csv; // BOM追加でExcelで文字化け防止
+        return '\uFEFF' + this.rowsToCSV(allRows); // BOM追加でExcelで文字化け防止
     }
 
     // 重複データを削除
@@ -2960,138 +3265,159 @@ class UI {
             const file = e.target.files[0];
             if (!file) return;
 
-            // 既存データがある場合は、追加するか置き換えるかを確認
-            const existingData = this.manager.getAllExpenses();
-            let replaceMode = false;
-
-            if (existingData.length > 0) {
-                const message = `現在${existingData.length}件のデータがあります。\n\nOK: 既存データに追加\nキャンセル: 既存データを削除して新規インポート`;
-                const addToExisting = confirm(message);
-                replaceMode = !addToExisting;
-
-                if (replaceMode) {
-                    // 本当に削除するか再確認
-                    const confirmDelete = confirm('既存データを削除してもよろしいですか？この操作は取り消せません。');
-                    if (!confirmDelete) {
-                        return; // インポートをキャンセル
-                    }
+            try {
+                // UTF-8で読んで文字化けしていたらShift_JIS（Excel保存のCSV）で読み直す
+                let csv = await this.readFileAsText(file, 'UTF-8');
+                if (csv.includes('\uFFFD')) {
+                    csv = await this.readFileAsText(file, 'Shift_JIS');
                 }
+
+                // 既存データに触る前に、まずCSVを解析する
+                const { expenses, errors } = this.parseExpensesCSV(csv);
+                if (expenses.length === 0) {
+                    alert(`読み込めるデータがありませんでした。既存のデータはそのままです。${errors.length ? `\n\n${errors.slice(0, 5).join('\n')}` : ''}`);
+                    return;
+                }
+
+                const existingCount = this.manager.getAllExpenses().length;
+                const mode = existingCount > 0
+                    ? await this.askImportMode(expenses.length, existingCount, errors)
+                    : 'add';
+                if (!mode) return; // やめる
+
+                await this.processCSVImport(expenses, mode === 'replace', errors.length);
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('インポートに失敗しました: ' + error.message);
             }
-
-            const reader = new FileReader();
-
-            reader.onload = async (event) => {
-                try {
-                    const csv = event.target.result;
-                    await this.processCSVImport(csv, replaceMode);
-                } catch (error) {
-                    console.error('Import error:', error);
-                    alert('インポートに失敗しました: ' + error.message);
-                }
-            };
-
-            reader.readAsText(file, 'UTF-8');
         };
 
         input.click();
     }
 
-    // CSV解析とインポート処理（バッチ処理対応）
-    async processCSVImport(csv, replaceMode = false) {
-        // プログレス表示用のオーバーレイを作成
+    // ファイルを指定の文字コードで読む
+    readFileAsText(file, encoding) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve(event.target.result);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsText(file, encoding);
+        });
+    }
+
+    // インポート方法を選ぶダイアログ（'add' | 'replace' | null）
+    askImportMode(importCount, existingCount, errors) {
+        return new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; z-index:10000;';
+            const errorNote = errors.length
+                ? `<p style="color:#d93025; font-size:13px; margin-top:8px;">読み込めなかった行が${errors.length}行あります（${this.escapeHtml(errors.slice(0, 3).join(' / '))}${errors.length > 3 ? ' ほか' : ''}）</p>`
+                : '';
+            overlay.innerHTML = `
+                <div style="background:white; border-radius:8px; padding:24px; max-width:460px; width:90%;">
+                    <h2 style="font-size:16px; margin-bottom:12px;">CSVのインポート</h2>
+                    <p style="font-size:14px; line-height:1.7;">CSVから<strong>${importCount}件</strong>読み込みました。<br>現在のデータは${existingCount}件です。</p>
+                    ${errorNote}
+                    <div style="display:flex; flex-direction:column; gap:8px; margin-top:20px;">
+                        <button data-mode="add" class="btn btn-primary">今のデータに追加する</button>
+                        <button data-mode="replace" class="btn btn-secondary" style="color:#d93025;">今のデータを全部消して置き換える</button>
+                        <button data-mode="" class="btn btn-secondary">やめる</button>
+                    </div>
+                </div>
+            `;
+            overlay.addEventListener('click', (e) => {
+                const btn = e.target.closest('button[data-mode]');
+                if (!btn && e.target !== overlay) return;
+                let mode = btn ? btn.dataset.mode : '';
+                if (mode === 'replace' && !confirm(`今の${existingCount}件をすべて削除して、CSVの${importCount}件に置き換えます。よろしいですか？`)) {
+                    return;
+                }
+                overlay.remove();
+                resolve(mode || null);
+            });
+            document.body.appendChild(overlay);
+        });
+    }
+
+    // CSV全体を支出データの配列に変換（不正な行はerrorsに集める）
+    parseExpensesCSV(csv) {
+        const rows = this.parseCSV(csv.replace(/^\uFEFF/, ''));
+        const expenses = [];
+        const errors = [];
+
+        rows.slice(1).forEach((values, index) => {
+            const lineNo = index + 2;
+            if (values.every(v => !v.trim())) return; // 空行
+            const [date, category, subcategory, amount, place, description, notes] = values.map(v => (v || '').trim());
+
+            const normalizedDate = this.normalizeDate(date);
+            const normalizedAmount = (amount || '').replace(/[¥￥,，円\s]/g, '');
+            if (!normalizedDate) {
+                errors.push(`${lineNo}行目: 日付「${date}」`);
+            } else if (!category) {
+                errors.push(`${lineNo}行目: カテゴリが空`);
+            } else if (!/^-?\d+$/.test(normalizedAmount)) {
+                errors.push(`${lineNo}行目: 金額「${amount}」`);
+            } else {
+                expenses.push({
+                    date: normalizedDate,
+                    category,
+                    subcategory: subcategory || '',
+                    amount: normalizedAmount,
+                    place: place || '',
+                    description: description || '',
+                    notes: notes || ''
+                });
+            }
+        });
+
+        return { expenses, errors };
+    }
+
+    // 2024/1/5 や 2024-1-5 を 2024-01-05 に揃える（不正ならnull）
+    normalizeDate(value) {
+        const match = /^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/.exec(value || '');
+        if (!match) return null;
+        const [, y, m, d] = match.map(Number);
+        const date = new Date(y, m - 1, d);
+        if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+        return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+
+    // CSV解析とインポート処理（解析済みのデータを保存する）
+    async processCSVImport(expenses, replaceMode = false, errorCount = 0) {
         const overlay = this.createProgressOverlay();
         document.body.appendChild(overlay);
 
         try {
-            // 既存データを削除する場合
-            if (replaceMode) {
-                this.manager.expenses = [];
-                this.manager.saveExpenses();
-                console.log('既存データを削除しました');
-            }
-
-            // BOMを除去
-            csv = csv.replace(/^\uFEFF/, '');
-
-            // CSVをパース
-            const lines = csv.split('\n');
-            const headers = this.parseCSVLine(lines[0]);
-
-            // データ行を取得（ヘッダーと空行を除く）
-            const dataLines = lines.slice(1).filter(line => line.trim());
-
-            console.log(`インポート開始: ${dataLines.length}件のデータ`);
-
-            let successCount = 0;
-            let errorCount = 0;
-            const allExpenses = []; // 一時的に全データを保持
-
-            // 全行を解析してメモリに保持
-            for (let i = 0; i < dataLines.length; i++) {
-                const line = dataLines[i];
-
-                // 進捗を更新（解析フェーズ）
-                if (i % 100 === 0) {
-                    const progress = Math.round((i / dataLines.length) * 50); // 50%まで
-                    this.updateProgress(overlay, progress, `${i}/${dataLines.length}件解析中...`);
-                    await new Promise(resolve => setTimeout(resolve, 0));
-                }
-
-                try {
-                    const values = this.parseCSVLine(line);
-
-                    if (values.length >= 4) {
-                        const [date, category, subcategory, amount, place, description] = values;
-
-                        if (date && category && amount) {
-                            allExpenses.push({
-                                date: date.trim(),
-                                category: category.trim(),
-                                subcategory: (subcategory || '').trim(),
-                                amount: amount.trim(),
-                                place: (place || '').trim(),
-                                description: (description || '').trim()
-                            });
-                            successCount++;
-                        }
-                    }
-                } catch (error) {
-                    console.error(`行 ${i + 2} でエラー:`, error);
-                    errorCount++;
-                }
-            }
-
-            // 進捗を更新（保存フェーズ）
-            this.updateProgress(overlay, 75, `${allExpenses.length}件のデータを保存中...`);
+            this.updateProgress(overlay, 50, `${expenses.length}件のデータを保存中...`);
             await new Promise(resolve => setTimeout(resolve, 100));
 
-            // 一括でデータベースに追加（最後に1回だけlocalStorageに保存）
+            // 置き換えの場合も、保存は最後の1回だけ（途中で空の状態を保存しない）
+            const previous = this.manager.expenses;
+            if (replaceMode) {
+                this.manager.expenses = [];
+            }
             try {
-                this.manager.addExpensesBatch(allExpenses);
-                console.log(`保存完了: ${allExpenses.length}件`);
+                this.manager.addExpensesBatch(expenses);
             } catch (storageError) {
+                this.manager.expenses = previous;
                 overlay.remove();
                 if (storageError.message.includes('容量超過')) {
-                    alert(`データ容量エラー: ${allExpenses.length}件のデータは大きすぎます。\n\n推奨: 年別にCSVファイルを分けてインポートしてください。`);
+                    alert(`データ容量エラー: ${expenses.length}件のデータは大きすぎます。\n\n推奨: 年別にCSVファイルを分けてインポートしてください。`);
                 }
                 throw storageError;
             }
 
-            // 完了
             this.updateProgress(overlay, 100, '完了！');
             await new Promise(resolve => setTimeout(resolve, 500));
-
-            // オーバーレイを削除
             overlay.remove();
 
             // 画面を更新
             this.renderExpenseList();
 
-            // 結果を表示
-            const message = `インポート完了: ${successCount}件成功${errorCount > 0 ? `, ${errorCount}件失敗` : ''}`;
+            const message = `インポート完了: ${expenses.length}件${replaceMode ? '（置き換え）' : '（追加）'}${errorCount > 0 ? `, ${errorCount}行は読み込めませんでした` : ''}`;
             this.showMessage(message);
-            console.log(message);
-
         } catch (error) {
             if (overlay && overlay.parentElement) {
                 overlay.remove();
@@ -3100,38 +3426,44 @@ class UI {
         }
     }
 
-    // CSV行をパース（ダブルクォートで囲まれた値に対応）
-    parseCSVLine(line) {
-        const values = [];
+    // CSV全体をパース（ダブルクォート内のカンマ・改行・"" に対応）
+    parseCSV(text) {
+        const rows = [];
+        let row = [];
         let current = '';
         let inQuotes = false;
 
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            const nextChar = line[i + 1];
-
-            if (char === '"') {
-                if (inQuotes && nextChar === '"') {
-                    // エスケープされたダブルクォート
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            if (inQuotes) {
+                if (char === '"' && text[i + 1] === '"') {
                     current += '"';
                     i++;
+                } else if (char === '"') {
+                    inQuotes = false;
                 } else {
-                    // クォートの開始/終了
-                    inQuotes = !inQuotes;
+                    current += char;
                 }
-            } else if (char === ',' && !inQuotes) {
-                // カンマ区切り（クォート外）
-                values.push(current);
+            } else if (char === '"') {
+                inQuotes = true;
+            } else if (char === ',') {
+                row.push(current);
+                current = '';
+            } else if (char === '\n' || char === '\r') {
+                if (char === '\r' && text[i + 1] === '\n') i++;
+                row.push(current);
+                rows.push(row);
+                row = [];
                 current = '';
             } else {
                 current += char;
             }
         }
-
-        // 最後の値を追加
-        values.push(current);
-
-        return values;
+        if (current || row.length) {
+            row.push(current);
+            rows.push(row);
+        }
+        return rows;
     }
 
     // プログレス表示用のオーバーレイを作成
@@ -3222,7 +3554,7 @@ class UI {
             bulkBtn.classList.add('active');
 
             // 共通日付を今日に設定
-            const today = new Date().toISOString().split('T')[0];
+            const today = this.formatLocalDate();
             document.getElementById('bulkCommonDate').value = today;
 
             // 一括入力モードに切り替えたら、初期行を追加
@@ -3240,7 +3572,7 @@ class UI {
         const tbody = document.getElementById('bulkInputTableBody');
         this.bulkRowIdCounter++;
         const rowId = this.bulkRowIdCounter;
-        const today = new Date().toISOString().split('T')[0];
+        const today = this.formatLocalDate();
 
         // 既存の1行目からカテゴリを取得（2行目以降の場合）
         const firstRow = tbody.querySelector('tr:first-child');
@@ -3478,6 +3810,7 @@ class UI {
         let savedCount = 0;
         const errors = [];
         const validExpenses = [];
+        const validRows = [];
 
         // 毎月繰り返すチェックの確認
         const repeatCheckbox = document.getElementById('bulkRepeatMonthly');
@@ -3492,13 +3825,17 @@ class UI {
             const description = row.querySelector('.bulk-description').value;
             const notes = row.querySelector('.bulk-notes').value;
 
+            // 日付とカテゴリは初期値が入るので、金額・場所・商品名・メモが空なら未使用の行として無視
+            if (!amount && !place && !description && !notes) return;
+
             // 必須項目チェック
             if (date && category && amount && parseFloat(amount) > 0) {
                 validExpenses.push({
                     date, category, subcategory, amount, place, description, notes
                 });
-            } else if (date || category || amount || place || description || notes) {
-                // 一部だけ入力されている場合はエラー
+                validRows.push(row);
+            } else {
+                // 一部だけ入力されている場合はエラー（行は消さずに残す）
                 errors.push(`行${index + 1}: 日付、カテゴリ、金額は必須です`);
             }
         });
@@ -3534,43 +3871,39 @@ class UI {
 
         // 繰り返し処理
         if (validExpenses.length > 0) {
-            if (repeatCheckbox.checked && repeatMonths > 1) {
-                // 複数月分の支出を作成
-                validExpenses.forEach(expense => {
-                    const baseDate = new Date(expense.date);
-                    for (let i = 0; i < repeatMonths; i++) {
-                        const newDate = new Date(baseDate);
-                        newDate.setMonth(baseDate.getMonth() + i);
-
-                        const repeatedExpense = {
-                            ...expense,
-                            date: newDate.toISOString().split('T')[0]
-                        };
-                        this.manager.addExpense(repeatedExpense);
-                        savedCount++;
-                    }
-                });
-            } else {
-                // 通常の保存
-                validExpenses.forEach(expense => {
-                    this.manager.addExpense(expense);
-                    savedCount++;
-                });
-            }
+            const toSave = [];
+            validExpenses.forEach(expense => {
+                const months = repeatCheckbox.checked && repeatMonths > 1 ? repeatMonths : 1;
+                for (let i = 0; i < months; i++) {
+                    toSave.push({ ...expense, date: this.addMonthsToDate(expense.date, i) });
+                }
+            });
+            // まとめて追加（保存は1回だけ）
+            this.manager.addExpensesBatch(toSave);
+            savedCount = toSave.length;
 
             this.renderExpenseList();
             this.showMessage(`${savedCount}件の支出を記録しました`);
+            this.resetRepeatOption('bulk');
 
-            // テーブルをクリア
-            tbody.innerHTML = '';
-            this.bulkInputRows = [];
-            // bulkRowIdCounterはリセットしない（同じrowIdの再利用を防ぐため）
+            if (errors.length > 0) {
+                // 保存できた行だけ消して、エラーの行は直せるように残す
+                validRows.forEach(row => {
+                    this.bulkInputRows = this.bulkInputRows.filter(id => id !== parseInt(row.dataset.rowId));
+                    row.remove();
+                });
+            } else {
+                // テーブルをクリア
+                tbody.innerHTML = '';
+                this.bulkInputRows = [];
+                // bulkRowIdCounterはリセットしない（同じrowIdの再利用を防ぐため）
 
-            // 新しい行を3つ追加
-            this.addBulkInputRow();
-            this.addBulkInputRow();
-            this.addBulkInputRow();
-        } else {
+                // 新しい行を3つ追加
+                this.addBulkInputRow();
+                this.addBulkInputRow();
+                this.addBulkInputRow();
+            }
+        } else if (errors.length === 0) {
             alert('記録するデータがありません。\n日付、カテゴリ、金額を入力してください。');
         }
 
@@ -3751,8 +4084,14 @@ class UI {
         // Topixを保存（既存のplansは保持）
         this.manager.saveMemo(this.currentEditingYearMonth, events.join('\n'), memo.plans || '');
 
-        // モーダルを閉じる
+        // モーダルを閉じる（閉じるとcurrentEditingYearMonthが消えるので先に控える）
+        const savedYearMonth = this.currentEditingYearMonth;
         this.closeTopixModal();
+
+        // メモ欄が同じ月を表示していれば読み直す（古い内容で上書きしないように）
+        if (document.getElementById('memoYearMonth').value === savedYearMonth) {
+            this.loadMemo(true);
+        }
 
         // 推移タブが表示されている場合は再描画
         const activeTab = document.querySelector('.tab-content.active');
@@ -3761,8 +4100,8 @@ class UI {
         }
 
         // 成功メッセージ
-        const [year, month] = this.currentEditingYearMonth.split('-');
-        alert(`${year}年${parseInt(month)}月のTopixを保存しました（${events.length}件）`);
+        const [year, month] = savedYearMonth.split('-');
+        this.showMessage(`${year}年${parseInt(month)}月のTopixを保存しました（${events.length}件）`);
     }
 
     // Topixモーダルを閉じる
@@ -4000,7 +4339,7 @@ class FurusatoUI {
 
         // 支出データからも年を取得
         if (expenses.length > 0) {
-            const expenseYears = expenses.map(e => new Date(e.date).getFullYear());
+            const expenseYears = expenses.map(e => parseInt((e.date || '').substring(0, 4))).filter(y => y > 1900);
             minYear = Math.min(...expenseYears, minYear);
             maxYear = Math.max(...expenseYears, maxYear);
         }
@@ -4085,9 +4424,9 @@ class FurusatoUI {
                 <tr data-entry-id="${entry.id}">
                     <td style="text-align: center;">${index + 1}</td>
                     <td style="text-align: right; font-weight: 500;">¥${entry.amount.toLocaleString()}</td>
-                    <td>${entry.item}</td>
-                    <td>${entry.applicant || ''}</td>
-                    <td>${entry.municipality || '-'}</td>
+                    <td>${ui.escapeHtml(entry.item || '')}</td>
+                    <td>${ui.escapeHtml(entry.applicant || '')}</td>
+                    <td>${ui.escapeHtml(entry.municipality || '-')}</td>
                     <td style="text-align: center;">
                         <input type="checkbox" ${entry.itemReceived ? 'checked' : ''}
                                data-action="toggleItem" data-id="${entry.id}"

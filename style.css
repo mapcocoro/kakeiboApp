@@ -516,7 +516,7 @@ tbody tr:hover {
 
 .charts-container {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 16px;
 }
 
@@ -1088,7 +1088,7 @@ td.sticky-col.memo-label {
 }
 
 .monthly-data-table th:first-child {
-    width: 60px;
+    width: 110px;
 }
 
 .monthly-data-table th:nth-child(2) {
@@ -1460,4 +1460,314 @@ td.sticky-col.memo-label {
 
 .memo-cell:hover::after {
     opacity: 0.5;
+}
+
+/* ========================================
+   月の振り返り（分析タブ）
+   ======================================== */
+.review-card {
+    border-bottom: 1px solid #dadce0;
+    padding-bottom: 24px;
+}
+
+.review-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.review-header h2 {
+    font-size: 18px;
+    margin-bottom: 0;
+}
+
+.review-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.review-nav input[type="month"] {
+    padding: 6px 8px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.review-summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.review-tile {
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    padding: 14px 16px;
+    background: #fff;
+}
+
+.review-tile-main {
+    background: #e8f0fe;
+    border-color: #d2e3fc;
+}
+
+.review-tile-label {
+    font-size: 12px;
+    color: #5f6368;
+    margin-bottom: 6px;
+}
+
+.review-tile-value {
+    font-size: 26px;
+    font-weight: 600;
+    color: #202124;
+    font-variant-numeric: tabular-nums;
+}
+
+.review-tile-value.small {
+    font-size: 17px;
+}
+
+.review-tile-sub {
+    font-size: 12px;
+    color: #5f6368;
+    margin-top: 6px;
+}
+
+.diff-up { color: #d93025; }
+.diff-down { color: #188038; }
+.diff-none { color: #9aa0a6; }
+
+.pace-bar {
+    position: relative;
+    height: 8px;
+    background: #f1f3f4;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+.pace-fill {
+    height: 100%;
+    background: #1a73e8;
+    border-radius: 4px;
+}
+
+.pace-fill.over {
+    background: #d93025;
+}
+
+.pace-marker {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 14px;
+    background: #202124;
+}
+
+.review-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.review-table th {
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    color: #5f6368;
+    padding: 8px 10px;
+    border-bottom: 2px solid #dadce0;
+    background: #f8f9fa;
+}
+
+.review-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.review-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.review-table .strong {
+    font-weight: 600;
+}
+
+.review-table .muted {
+    color: #5f6368;
+}
+
+.review-row {
+    cursor: pointer;
+}
+
+.review-row:hover {
+    background: #f8f9fa;
+}
+
+.review-row.open {
+    background: #f1f3f4;
+}
+
+.review-row.flag-over td:first-child {
+    box-shadow: inset 3px 0 0 #d93025;
+}
+
+.review-row.flag-over {
+    background: #fce8e6;
+}
+
+.review-row.flag-under td:first-child {
+    box-shadow: inset 3px 0 0 #188038;
+}
+
+.share-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 140px;
+}
+
+.share-cell span {
+    font-size: 12px;
+    color: #5f6368;
+    width: 32px;
+    text-align: right;
+}
+
+.share-bar {
+    flex: 1;
+    height: 8px;
+    background: #f1f3f4;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.share-fill {
+    height: 100%;
+}
+
+.review-table tfoot td {
+    font-weight: 600;
+    border-top: 2px solid #202124;
+    border-bottom: none;
+}
+
+.review-detail-row > td {
+    background: #fafafa;
+    padding: 4px 10px 12px 40px;
+}
+
+.review-detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.review-detail-table td {
+    padding: 4px 8px;
+    border-bottom: 1px dotted #e0e0e0;
+    color: #3c4043;
+}
+
+.review-detail-table td:first-child {
+    width: 48px;
+    color: #5f6368;
+}
+
+.review-note,
+.review-empty {
+    font-size: 12px;
+    color: #5f6368;
+    margin-top: 10px;
+    line-height: 1.6;
+}
+
+.analysis-section-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #202124;
+    padding: 20px 16px 8px;
+}
+
+.stat-pct {
+    font-size: 12px;
+    color: #5f6368;
+    font-weight: 400;
+}
+
+.stat-sub {
+    font-size: 11px;
+    color: #5f6368;
+    margin-top: 2px;
+}
+
+.monthly-data-table tfoot td {
+    font-weight: 600;
+    border-top: 2px solid #dadce0;
+    padding: 8px 10px;
+}
+
+.monthly-data-table tfoot td:nth-child(3) {
+    text-align: right;
+}
+
+/* 推移タブ：今月の列 */
+.timeline-table th.current-month {
+    background: #1a73e8 !important;
+    color: #fff !important;
+}
+
+@media (max-width: 900px) {
+    .review-summary {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* カテゴリ別集計：サマリーは横一列で全幅に */
+#categoryStats .category-summary,
+#categoryStats hr {
+    grid-column: 1 / -1;
+}
+
+.category-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+}
+
+.summary-item span {
+    color: #5f6368;
+    font-size: 12px;
+    margin-right: 6px;
+}
+
+.summary-item strong {
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+}
+
+.review-table th:nth-child(3) {
+    width: 240px;
+}
+
+/* 推移表：合計行を下端に固定して常に見えるように */
+.timeline-table tr.total-row td {
+    position: sticky;
+    bottom: 0;
+    background: #f1f3f4;
+    font-weight: 600;
+    border-top: 2px solid #202124;
+    z-index: 5;
+}
+
+.timeline-table tr.total-row td.sticky-col {
+    z-index: 11;
 }
