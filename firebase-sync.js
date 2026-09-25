@@ -11,7 +11,7 @@ const firebaseSync = (() => {
     // バックアップ設定
     const BACKUP_INDEX_DOC = 'backup_index'; // 利用可能なバックアップ日付の一覧
     const MAX_BACKUPS = 30;                  // 保持する日数
-    const OTHER_KEYS = ['savedReports', 'monthlyMemos', 'yearMemos', 'furusatoTaxData'];
+    const OTHER_KEYS = ['savedReports', 'monthlyMemos', 'yearMemos', 'furusatoTaxData', 'furusatoLimits'];
 
     // 保存デバウンス用
     let pendingSaves = {};
@@ -94,8 +94,7 @@ const firebaseSync = (() => {
             }
 
             // その他のキー（単一ドキュメント）
-            const otherKeys = ['savedReports', 'monthlyMemos', 'yearMemos', 'furusatoTaxData'];
-            for (const key of otherKeys) {
+            for (const key of OTHER_KEYS) {
                 const doc = await db.collection(COLLECTION).doc(key).get();
                 if (doc.exists) {
                     localStorage.setItem(key, JSON.stringify(doc.data().value));
@@ -137,8 +136,7 @@ const firebaseSync = (() => {
         }
 
         // その他のキー
-        const otherKeys = ['savedReports', 'monthlyMemos', 'yearMemos', 'furusatoTaxData'];
-        for (const key of otherKeys) {
+        for (const key of OTHER_KEYS) {
             if (!callbacks[key]) continue;
             db.collection(COLLECTION).doc(key).onSnapshot(snapshot => {
                 if (!snapshot.exists) return;

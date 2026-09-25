@@ -29,10 +29,17 @@
                 <span id="userName" style="font-size:12px; color:#5f6368; margin-right:8px;"></span>
                 <button id="logoutBtn" class="btn btn-secondary" style="font-size:11px; padding:4px 10px;">ログアウト</button>
                 <span id="syncIndicator" style="font-size:12px; margin-right:8px;"></span>
-                <button id="removeDuplicatesBtn" class="btn btn-secondary">重複削除</button>
-                <button id="exportBtn" class="btn btn-secondary">データエクスポート</button>
-                <button id="importBtn" class="btn btn-secondary">データインポート</button>
-                <button id="backupBtn" class="btn btn-secondary">🛡 バックアップ</button>
+                <!-- ふだん使わない操作は「データ管理」メニューにまとめる -->
+                <details class="data-menu" id="dataMenu">
+                    <summary class="btn btn-secondary">データ管理 ▾</summary>
+                    <div class="data-menu-list">
+                        <button id="exportBtn">CSVに書き出す<small>一覧タブでは絞り込み中の分だけ</small></button>
+                        <button id="importBtn">CSVから読み込む</button>
+                        <button id="removeDuplicatesBtn">重複データを削除</button>
+                        <hr>
+                        <button id="backupBtn">🛡 バックアップから復元<small>毎日自動で保存されています</small></button>
+                    </div>
+                </details>
             </div>
         </header>
 
@@ -74,10 +81,10 @@
                             <tbody>
                                 <tr>
                                     <td><input type="date" id="date" required></td>
-                                    <td><input type="text" id="place" placeholder="場所"></td>
+                                    <td><input type="text" id="place" placeholder="場所" list="placeSuggestions" autocomplete="off"></td>
                                     <td><input type="number" id="amount" min="0" placeholder="金額" required></td>
                                     <td><button type="button" class="tax-btn" id="normalTaxBtn">税込</button></td>
-                                    <td><input type="text" id="description" placeholder="商品名"></td>
+                                    <td><input type="text" id="description" placeholder="商品名" list="descriptionSuggestions" autocomplete="off"></td>
                                     <td>
                                         <select id="category" required>
                                             <option value="">選択</option>
@@ -138,7 +145,7 @@
                     </div>
                     <div class="form-group">
                         <label for="bulkCommonPlace">共通場所</label>
-                        <input type="text" id="bulkCommonPlace" placeholder="例: イオン">
+                        <input type="text" id="bulkCommonPlace" placeholder="例: イオン" list="placeSuggestions" autocomplete="off">
                     </div>
                     <button id="applyCommonBtn" class="btn btn-secondary">全行に反映</button>
                 </div>
@@ -180,6 +187,19 @@
                     </table>
                 </div>
             </div>
+
+            <!-- 入力候補（過去の入力から生成） -->
+            <datalist id="placeSuggestions"></datalist>
+            <datalist id="descriptionSuggestions"></datalist>
+
+            <!-- 最近の入力 -->
+            <div class="card recent-card">
+                <div class="recent-header">
+                    <h2>最近の入力</h2>
+                    <div id="recentSummary" class="recent-summary"></div>
+                </div>
+                <div id="recentEntries"></div>
+            </div>
         </div>
 
         <!-- 一覧タブ -->
@@ -192,11 +212,17 @@
                         <input type="text" id="expenseSearch" placeholder="商品名・場所・メモ・カテゴリ" class="filter-search">
                         <label for="dateRangeType">期間</label>
                         <select id="dateRangeType" class="filter-select">
+                            <option value="month" selected>月指定</option>
                             <option value="all">全期間</option>
-                            <option value="month">月指定</option>
                             <option value="custom">カスタム期間</option>
                         </select>
-                        <input type="month" id="monthFilter" style="display: none;">
+                        <button id="listPrevMonthBtn" class="btn btn-secondary month-nav" title="前の月">◀</button>
+                        <input type="month" id="monthFilter">
+                        <button id="listNextMonthBtn" class="btn btn-secondary month-nav" title="次の月">▶</button>
+                        <label for="listCategory">カテゴリ</label>
+                        <select id="listCategory" class="filter-select">
+                            <option value="">すべて</option>
+                        </select>
                         <input type="date" id="startDate" placeholder="開始日" style="display: none;">
                         <input type="date" id="endDate" placeholder="終了日" style="display: none;">
                         <button id="applyFilter" class="btn btn-secondary" style="display: none;">適用</button>

@@ -1771,3 +1771,244 @@ td.sticky-col.memo-label {
 .timeline-table tr.total-row td.sticky-col {
     z-index: 11;
 }
+
+/* ========================================
+   一覧タブ
+   ======================================== */
+#filterInfo {
+    color: #202124 !important;
+    font-weight: 500;
+}
+
+#displayTotal {
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+}
+
+#filterCount {
+    color: #5f6368 !important;
+    font-weight: 400 !important;
+}
+
+#expenseTable th:nth-child(1) { width: 96px; }
+#expenseTable th:nth-child(2) { width: 14%; }
+#expenseTable th:nth-child(3) { width: 150px; }
+#expenseTable th:nth-child(4) { width: 13%; }
+#expenseTable th:nth-child(5) { width: 100px; text-align: right; }
+#expenseTable th:nth-child(7) { width: 14%; }
+#expenseTable th:nth-child(8) { width: 96px; }
+
+#expenseTable td:nth-child(1) {
+    color: #5f6368;
+    font-variant-numeric: tabular-nums;
+}
+
+#expenseTable td:nth-child(5) {
+    text-align: right;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+#expenseTable td:nth-child(7) {
+    color: #5f6368;
+}
+
+#monthFilter {
+    padding: 4px 6px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.month-nav {
+    padding: 4px 8px;
+}
+
+/* ========================================
+   入力タブ：自動選択・最近の入力
+   ======================================== */
+@keyframes autoFilledFlash {
+    from { background-color: #e8f0fe; box-shadow: 0 0 0 2px #1a73e8; }
+    to { background-color: transparent; box-shadow: none; }
+}
+
+select.auto-filled {
+    animation: autoFilledFlash 1.2s ease-out;
+}
+
+.recent-card {
+    margin-top: 16px;
+}
+
+.recent-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.recent-summary {
+    display: flex;
+    gap: 20px;
+    font-size: 13px;
+    color: #5f6368;
+}
+
+.recent-summary strong {
+    color: #202124;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+}
+
+.recent-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #eee;
+    border-right: none;
+}
+
+.recent-table td.muted,
+.recent-table .muted {
+    color: #5f6368;
+    font-size: 12px;
+}
+
+.recent-table td:first-child {
+    width: 56px;
+}
+
+.recent-table td.num {
+    text-align: right;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    width: 100px;
+}
+
+.recent-actions {
+    width: 64px;
+    text-align: right;
+}
+
+/* ========================================
+   ふるさと納税：合計・上限・未完了
+   ======================================== */
+.furusato-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 28px;
+    padding: 12px 16px;
+}
+
+.furusato-total strong {
+    font-size: 18px;
+    font-variant-numeric: tabular-nums;
+}
+
+.furusato-limit {
+    min-width: 260px;
+}
+
+.furusato-limit-text {
+    font-size: 13px;
+    color: #3c4043;
+}
+
+.furusato-limit .pace-bar {
+    margin-top: 6px;
+    background: #fff;
+}
+
+.furusato-pending {
+    font-size: 13px;
+    color: #b06000;
+}
+
+.furusato-pending.done {
+    color: #188038;
+}
+
+.furusato-search-info {
+    font-size: 12px;
+    color: #5f6368;
+    margin-bottom: 6px;
+}
+
+.btn-link {
+    background: none;
+    border: none;
+    color: #1a73e8;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 4px;
+}
+
+.btn-link:hover {
+    text-decoration: underline;
+}
+
+/* ========================================
+   ヘッダー：データ管理メニュー
+   ======================================== */
+.header-actions {
+    align-items: center;
+}
+
+.data-menu {
+    position: relative;
+}
+
+.data-menu > summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.data-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.data-menu-list {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    background: #fff;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    padding: 6px;
+    min-width: 240px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+}
+
+.data-menu-list button {
+    background: none;
+    border: none;
+    text-align: left;
+    padding: 8px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #202124;
+    cursor: pointer;
+}
+
+.data-menu-list button:hover {
+    background: #f1f3f4;
+}
+
+.data-menu-list small {
+    display: block;
+    font-size: 11px;
+    color: #5f6368;
+    margin-top: 2px;
+}
+
+.data-menu-list hr {
+    border: none;
+    border-top: 1px solid #eee;
+    margin: 4px 0;
+}
